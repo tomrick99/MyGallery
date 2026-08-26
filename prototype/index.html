@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TOM RICK — Photography 2024—2026</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+
+  <!-- 顶部极简导航 -->
+  <header class="site-header">
+    <span class="site-header__name">TOM RICK</span>
+    <nav class="site-header__nav">
+      <span>INDEX</span>
+      <span>ARCHIVE</span>
+      <span>ABOUT</span>
+    </nav>
+  </header>
+
+  <!-- Hero：大标题 + 随机精选照片 -->
+  <section class="hero">
+    <div class="hero__text">
+      <h1 class="hero__title">
+        <span class="hero__line">TOM</span>
+        <span class="hero__line">RICK</span>
+      </h1>
+      <p class="hero__sub">
+        <span>PHOTOGRAPHY</span>
+        <span class="hero__years">2024 — 2026</span>
+      </p>
+      <p class="hero__note">A personal photographic archive.<br />Selected frames, arranged by time.</p>
+    </div>
+    <figure class="hero__figure" id="heroFigure">
+      <img id="heroImage" src="" alt="Featured photograph" />
+      <figcaption class="hero__caption" id="heroCaption"></figcaption>
+    </figure>
+  </section>
+
+  <!-- 横向流动照片流 -->
+  <section class="stream-section">
+    <div class="section-head">
+      <span class="section-head__label">SELECTED FRAMES</span>
+      <span class="section-head__hint">SCROLL / DRIFT →</span>
+    </div>
+    <div class="stream" id="stream">
+      <!-- 由 script.js 根据 mock 数据渲染 -->
+    </div>
+  </section>
+
+  <!-- 时间归档 -->
+  <section class="archive">
+    <div class="section-head section-head--archive">
+      <span class="section-head__label">ARCHIVE BY TIME</span>
+    </div>
+    <div id="archiveRoot">
+      <!-- 由 script.js 按 year/month 分组渲染 -->
+    </div>
+  </section>
+
+  <footer class="site-footer">
+    <span>© 2024 — 2026 TOM RICK</span>
+    <span>VISUAL PROTOTYPE · DESIGN LAB</span>
+  </footer>
+
+  <script src="mockPhotos.js"></script>
+  <script src="script.js"></script>
+</body>
+</html>

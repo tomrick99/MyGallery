@@ -1,0 +1,279 @@
+/* ============================================================
+   TOM RICK — Photography Archive · Visual Prototype
+   Modern Editorial × Apple Minimalism × Analog Film Feeling
+   ============================================================ */
+
+:root {
+  --bg: #f5f3ee;            /* 米白 */
+  --bg-soft: #efede7;
+  --ink: #1a1a18;
+  --ink-soft: #6f6c65;
+  --ink-faint: #a8a49b;
+  --rule: #d9d5cc;
+  --serif: "Didot", "Bodoni MT", "Playfair Display", Georgia, "Times New Roman", serif;
+  --sans: "Helvetica Neue", Helvetica, Arial, "PingFang SC", sans-serif;
+  --mono: "SF Mono", "Menlo", "Courier New", monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--sans);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+::selection { background: var(--ink); color: var(--bg); }
+
+img { display: block; width: 100%; height: 100%; object-fit: cover; }
+
+/* ---------- 入场动效（克制） ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 1s cubic-bezier(.22,.61,.36,1), transform 1s cubic-bezier(.22,.61,.36,1);
+}
+.reveal.is-visible { opacity: 1; transform: translateY(0); }
+
+/* ---------- 顶部导航 ---------- */
+.site-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 28px 48px;
+  font-size: 11px;
+  letter-spacing: .22em;
+  color: var(--ink);
+}
+.site-header__name { font-weight: 600; }
+.site-header__nav { display: flex; gap: 36px; color: var(--ink-soft); }
+.site-header__nav span { cursor: pointer; transition: color .3s; }
+.site-header__nav span:hover { color: var(--ink); }
+
+/* ---------- Hero ---------- */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, .85fr);
+  gap: 48px;
+  align-items: end;
+  padding: 8vh 48px 12vh;
+  min-height: 78vh;
+  position: relative;
+}
+.hero__text { padding-bottom: 4vh; }
+.hero__title {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(72px, 12.5vw, 188px);
+  line-height: .92;
+  letter-spacing: .01em;
+  color: var(--ink);
+}
+.hero__line { display: block; }
+.hero__line:last-child { margin-left: .55em; }   /* 非对称错位 */
+
+.hero__sub {
+  margin-top: 5vh;
+  display: flex;
+  gap: 40px;
+  font-size: 12px;
+  letter-spacing: .3em;
+  color: var(--ink-soft);
+}
+.hero__years { color: var(--ink-faint); }
+
+.hero__note {
+  margin-top: 28px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--ink-soft);
+  max-width: 300px;
+}
+
+.hero__figure {
+  position: relative;
+  height: 66vh;
+  align-self: center;
+  overflow: hidden;
+}
+.hero__figure img {
+  filter: saturate(.92) contrast(1.02);          /* 轻微胶片气质 */
+  transition: transform 1.4s cubic-bezier(.22,.61,.36,1);
+}
+.hero__figure:hover img { transform: scale(1.04); }
+.hero__caption {
+  position: absolute;
+  left: 0;
+  bottom: -34px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .18em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+/* ---------- 通用 section 头 ---------- */
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 48px;
+  margin-bottom: 48px;
+  font-size: 11px;
+  letter-spacing: .26em;
+  color: var(--ink-soft);
+}
+.section-head__hint { color: var(--ink-faint); }
+.section-head--archive {
+  border-top: 1px solid var(--rule);
+  padding-top: 64px;
+}
+
+/* ---------- 横向照片流 ---------- */
+.stream-section { padding: 6vh 0 14vh; }
+.stream {
+  display: flex;
+  align-items: center;
+  gap: clamp(32px, 4vw, 72px);
+  padding: 0 48px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  cursor: grab;
+}
+.stream::-webkit-scrollbar { display: none; }
+.stream.is-dragging { cursor: grabbing; }
+
+.stream__item {
+  flex: 0 0 auto;
+  transition: opacity .5s ease;
+}
+/* 高度不一，营造杂志式节奏 */
+.stream__item--a { width: clamp(260px, 26vw, 420px); height: clamp(340px, 34vw, 540px); }
+.stream__item--b { width: clamp(300px, 32vw, 520px); height: clamp(220px, 24vw, 380px); margin-top: 9vh; }
+.stream__item--c { width: clamp(220px, 22vw, 340px); height: clamp(300px, 30vw, 460px); margin-top: -7vh; }
+
+.stream__item figure {
+  width: 100%; height: 100%;
+  overflow: hidden;
+}
+.stream__item img {
+  transition: transform 1s cubic-bezier(.22,.61,.36,1), filter .6s ease;
+  filter: saturate(.92) contrast(1.02);
+}
+.stream__item figcaption {
+  margin-top: 12px;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .16em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  height: 14px;
+}
+
+/* hover：聚焦放大，其他轻微退场 */
+.stream:hover .stream__item { opacity: .35; }
+.stream .stream__item:hover { opacity: 1; }
+.stream .stream__item:hover img { transform: scale(1.05); }
+
+/* ---------- 时间归档 ---------- */
+.archive { padding-bottom: 16vh; }
+
+.archive-year {
+  padding: 0 48px;
+  margin-bottom: 12vh;
+}
+.archive-year__label {
+  font-family: var(--serif);
+  font-size: clamp(56px, 8vw, 120px);
+  line-height: 1;
+  color: var(--ink);
+  margin-bottom: 8vh;
+}
+.archive-year__label small {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: .28em;
+  color: var(--ink-faint);
+  vertical-align: super;
+  margin-left: 16px;
+}
+
+.archive-month { margin-bottom: 12vh; }
+.archive-month__label {
+  font-size: 12px;
+  letter-spacing: .4em;
+  color: var(--ink-soft);
+  margin-bottom: 5vh;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+.archive-month__label::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--rule);
+}
+
+/* 杂志式漂浮布局：非对称 grid，依靠 margin 错位 */
+.archive-month__grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: clamp(28px, 4vw, 64px);
+  align-items: flex-start;
+}
+
+.archive-card {
+  transition: opacity .5s ease;
+}
+.archive-card figure { overflow: hidden; }
+.archive-card img {
+  transition: transform 1s cubic-bezier(.22,.61,.36,1);
+  filter: saturate(.92) contrast(1.02);
+}
+.archive-card figcaption {
+  margin-top: 14px;
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: .16em;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+}
+
+/* 同一月份内照片的尺寸/错位模式（按序号循环） */
+.archive-card--0 { width: min(46vw, 620px); aspect-ratio: 3 / 2; }
+.archive-card--1 { width: min(24vw, 340px); aspect-ratio: 3 / 4; margin-top: 12vh; }
+.archive-card--2 { width: min(30vw, 430px); aspect-ratio: 4 / 5; margin-top: -4vh; margin-left: auto; }
+.archive-card--3 { width: min(52vw, 700px); aspect-ratio: 16 / 10; margin-top: 6vh; }
+
+/* 归档 hover：聚焦放大，其余轻微降透明 */
+.archive-month__grid:hover .archive-card { opacity: .35; }
+.archive-month__grid .archive-card:hover { opacity: 1; }
+.archive-month__grid .archive-card:hover img { transform: scale(1.045); }
+
+/* ---------- 页脚 ---------- */
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  padding: 40px 48px 48px;
+  border-top: 1px solid var(--rule);
+  font-size: 10px;
+  letter-spacing: .24em;
+  color: var(--ink-faint);
+}
+
+/* ---------- 响应式 ---------- */
+@media (max-width: 860px) {
+  .site-header, .section-head, .archive-year, .stream, .site-footer { padding-left: 24px; padding-right: 24px; }
+  .hero { grid-template-columns: 1fr; padding: 6vh 24px 10vh; min-height: auto; }
+  .hero__figure { height: 52vh; }
+  .archive-card--0, .archive-card--1, .archive-card--2, .archive-card--3 {
+    width: 100%; margin: 0 0 4vh; margin-left: 0;
+  }
+}
