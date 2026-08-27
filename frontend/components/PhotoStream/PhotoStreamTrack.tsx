@@ -44,6 +44,7 @@ export default function PhotoStreamTrack({
             key={`${photo.id}-${i}`}
             className={`${styles.item} ${styles[variant]}`}
             aria-hidden={duplicate || undefined}
+            data-loop-start={i === photos.length ? "" : undefined}
           >
             <div className={styles.frame}>
               <Image

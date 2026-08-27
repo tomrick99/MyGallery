@@ -39,12 +39,30 @@ export default function PhotoStream({ children }: { children: ReactNode }) {
       }, IDLE_RESUME_MS);
     };
 
-    // Seamless reset: content is duplicated, so the midpoint of scrollWidth
-    // is visually identical to offset 0.
+    // Seamless reset: the track is duplicated (A B C D A B C D). The loop
+    // distance is measured from real DOM geometry — the horizontal offset
+    // of the second copy's first item relative to the first item — instead
+    // of assuming scrollWidth / 2 (container padding/gaps would skew that).
+    const measureCopyWidth = () => {
+      const first = el.firstElementChild;
+      const secondCopyStart = el.querySelector("[data-loop-start]");
+      if (!first || !secondCopyStart) return 0;
+      return (
+        secondCopyStart.getBoundingClientRect().left -
+        first.getBoundingClientRect().left
+      );
+    };
+
+    let copyWidth = measureCopyWidth();
+
+    const resizeObserver = new ResizeObserver(() => {
+      copyWidth = measureCopyWidth();
+    });
+    resizeObserver.observe(el);
+
     const keepInLoop = () => {
-      const half = el.scrollWidth / 2;
-      if (half > 0 && el.scrollLeft >= half) {
-        el.scrollLeft -= half;
+      if (copyWidth > 0 && el.scrollLeft >= copyWidth) {
+        el.scrollLeft -= copyWidth;
       }
     };
 
@@ -100,9 +118,8 @@ export default function PhotoStream({ children }: { children: ReactNode }) {
     let frame = 0;
     const drift = () => {
       if (idle && !dragging && !motionQuery.matches) {
-        const half = el.scrollWidth / 2;
         position += DRIFT_PX_PER_FRAME;
-        if (half > 0 && position >= half) position -= half;
+        if (copyWidth > 0 && position >= copyWidth) position -= copyWidth;
         el.scrollLeft = position;
       } else {
         // Re-sync after user input or loop reset.
@@ -115,6 +132,7 @@ export default function PhotoStream({ children }: { children: ReactNode }) {
     return () => {
       cancelAnimationFrame(frame);
       window.clearTimeout(idleTimer);
+      resizeObserver.disconnect();
       el.removeEventListener("wheel", onWheel);
       el.removeEventListener("pointerdown", onPointerDown);
       window.removeEventListener("pointermove", onPointerMove);
