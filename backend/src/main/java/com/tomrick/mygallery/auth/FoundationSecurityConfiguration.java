@@ -19,7 +19,15 @@ public class FoundationSecurityConfiguration {
     SecurityFilterChain foundationSecurityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers(HttpMethod.GET, "/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/actuator/health",
+                                "/actuator/health/**",
+                                "/api/v1/photos",
+                                "/api/v1/photos/featured",
+                                "/api/v1/photos/*",
+                                "/api/v1/archive"
+                        ).permitAll()
                         .anyRequest().denyAll())
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
