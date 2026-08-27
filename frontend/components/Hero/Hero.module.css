@@ -1,0 +1,140 @@
+/* ============================================================
+   Hero — editorial asymmetric title + featured photograph
+   Visual direction inherited from prototype/ (Step 1).
+   ============================================================ */
+
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 0.85fr);
+  gap: 48px;
+  align-items: end;
+  padding: 8vh 48px 12vh;
+  min-height: 78vh;
+}
+
+/* ---------- typography block ---------- */
+
+.text {
+  padding-bottom: 4vh;
+}
+
+.title {
+  font-family: var(--font-serif);
+  font-size: clamp(72px, 12.5vw, 188px);
+  line-height: 0.92;
+  letter-spacing: 0.01em;
+}
+
+.line {
+  display: block;
+}
+
+.lineIndent {
+  margin-left: 0.55em;
+}
+
+.sub {
+  margin-top: 5vh;
+  display: flex;
+  gap: 40px;
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  color: var(--color-muted);
+}
+
+.years {
+  opacity: 0.7;
+}
+
+.note {
+  margin-top: 28px;
+  font-size: 13px;
+  line-height: 1.9;
+  color: var(--color-muted);
+  max-width: 300px;
+}
+
+/* ---------- featured photograph ---------- */
+
+.figure {
+  align-self: center;
+}
+
+.frame {
+  position: relative;
+  height: 66vh;
+  overflow: hidden;
+}
+
+.image {
+  object-fit: cover; /* editorial crop, scoped to the Hero frame only */
+  filter: saturate(0.92) contrast(1.02);
+  animation: heroFade 500ms var(--ease-editorial);
+  transition: transform 1.4s var(--ease-editorial);
+}
+
+.frame:hover .image {
+  transform: scale(1.04);
+}
+
+.caption {
+  margin-top: 14px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+  animation: heroFade 500ms var(--ease-editorial);
+}
+
+@keyframes heroFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .image,
+  .caption {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ---------- mobile: vertical editorial layout ---------- */
+
+@media (max-width: 860px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 6vh;
+    align-items: start;
+    padding: 6vh 24px 10vh;
+    min-height: auto;
+  }
+
+  .text {
+    padding-bottom: 0;
+  }
+
+  .title {
+    font-size: clamp(56px, 18vw, 96px);
+  }
+
+  .sub {
+    flex-wrap: wrap;
+    gap: 16px 24px;
+    margin-top: 4vh;
+  }
+
+  .note {
+    max-width: none;
+  }
+
+  .frame {
+    height: 52vh;
+  }
+}
