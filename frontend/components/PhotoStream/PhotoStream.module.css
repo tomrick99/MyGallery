@@ -1,0 +1,145 @@
+/* ============================================================
+   PhotoStream — horizontal cinematic strip
+   Visual direction inherited from prototype/ (Step 1).
+   ============================================================ */
+
+.section {
+  padding: 6vh 0 14vh;
+}
+
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 0 48px;
+  margin-bottom: 48px;
+  font-size: 11px;
+  letter-spacing: 0.26em;
+  color: var(--color-muted);
+}
+
+.hint {
+  opacity: 0.7;
+}
+
+/* ---------- track ---------- */
+
+.stream {
+  display: flex;
+  align-items: center;
+  gap: clamp(32px, 4vw, 72px);
+  padding: 0 48px;
+  overflow-x: auto;
+  scrollbar-width: none;
+  cursor: grab;
+}
+
+.stream::-webkit-scrollbar {
+  display: none;
+}
+
+.dragging {
+  cursor: grabbing;
+}
+
+/* ---------- items & size variants ---------- */
+
+.item {
+  flex: 0 0 auto;
+  transition: opacity 0.5s var(--ease-editorial);
+}
+
+.frame {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+.image {
+  object-fit: cover; /* editorial crop, scoped to the stream frame only */
+  filter: saturate(0.92) contrast(1.02);
+  transition: transform 1s var(--ease-editorial);
+}
+
+.caption {
+  margin-top: 12px;
+  font-size: 10px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+
+.wide {
+  width: clamp(300px, 32vw, 520px);
+  height: clamp(220px, 24vw, 380px);
+  margin-top: 9vh;
+}
+
+.medium {
+  width: clamp(260px, 26vw, 420px);
+  height: clamp(340px, 34vw, 540px);
+}
+
+.portrait {
+  width: clamp(220px, 22vw, 340px);
+  height: clamp(300px, 30vw, 460px);
+  margin-top: -7vh;
+}
+
+/* ---------- hover (desktop only, restrained) ---------- */
+
+@media (hover: hover) {
+  .stream:hover .item {
+    opacity: 0.65;
+  }
+
+  .stream .item:hover {
+    opacity: 1;
+  }
+
+  .stream .item:hover .image {
+    transform: scale(1.045);
+  }
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .item,
+  .image {
+    transition: none;
+  }
+}
+
+/* ---------- mobile ---------- */
+
+@media (max-width: 860px) {
+  .header {
+    padding: 0 24px;
+    margin-bottom: 32px;
+  }
+
+  .stream {
+    padding: 0 24px;
+    gap: 24px;
+    cursor: default;
+  }
+
+  .wide {
+    width: 78vw;
+    height: 54vw;
+    margin-top: 4vh;
+  }
+
+  .medium {
+    width: 68vw;
+    height: 72vw;
+  }
+
+  .portrait {
+    width: 58vw;
+    height: 82vw;
+    margin-top: -3vh;
+  }
+}
