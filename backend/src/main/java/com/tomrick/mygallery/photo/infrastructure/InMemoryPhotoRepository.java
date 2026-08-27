@@ -3,6 +3,7 @@ package com.tomrick.mygallery.photo.infrastructure;
 import com.tomrick.mygallery.photo.domain.Photo;
 import com.tomrick.mygallery.photo.domain.PhotoRepository;
 import com.tomrick.mygallery.photo.domain.PhotoVisibility;
+import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
@@ -12,7 +13,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-final class InMemoryPhotoRepository implements PhotoRepository {
+@Profile("memory")
+public class InMemoryPhotoRepository implements PhotoRepository {
 
     private static final String DERIVATIVE_BASE_URL =
             "https://images.example.test/mygallery/development-derivatives/";

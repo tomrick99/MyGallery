@@ -1,6 +1,8 @@
 spring:
   application:
     name: mygallery
+  profiles:
+    default: memory
 
 management:
   endpoints:
