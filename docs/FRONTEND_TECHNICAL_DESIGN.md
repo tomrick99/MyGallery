@@ -1,8 +1,10 @@
 # MyGallery — Frontend Technical Design
 
-**Version:** 0.1
+**Version:** 0.2
 **Status:** Draft
 **Step:** 3A — Frontend Technical Design
+
+**Changelog 0.2：** 修正 Random Hero 与 ISR 的缓存冲突（§5–§7）；修正 Server PhotoCard 与 Client Lightbox 的边界（§3、§5、§6、§12）；前端 DTO 对齐后端正式契约 `docs/DATA_MODEL.md` / `docs/TECHNICAL_DESIGN.md`（§7、§8、§9）。
 
 ---
 
@@ -37,7 +39,7 @@ MyGallery 正式前端是一个以摄影作品为核心的展示型网站，基�
 | Language | TypeScript | 严格模式 |
 | Router | Next.js App Router | 文件系统路由 |
 | Styling | CSS Modules | 无 Tailwind |
-| Images | `next/image` + Cloudinary loader | 响应式、防 CLS |
+| Images | 后端固定 variant URL（thumbnail / card / display） | 前端不自行构造 Cloudinary transformation；防 CLS |
 | Deployment | Vercel | — |
 | Repository | Monorepo | 前端根目录 `frontend/` |
 
@@ -68,7 +70,8 @@ frontend/
 │   │   ├── Header.tsx
 │   │   └── Header.module.css
 │   ├── Hero/
-│   │   ├── Hero.tsx
+│   │   ├── Hero.tsx                # Server：结构 + 确定性 fallback 渲染
+│   │   ├── HeroPicker.tsx          # Client：水合后从 featured 池随机选择
 │   │   └── Hero.module.css
 │   ├── PhotoStream/
 │   │   ├── PhotoStream.tsx         # Client：交互外壳
@@ -86,6 +89,7 @@ frontend/
 │   ├── Lightbox/
 │   │   ├── Lightbox.tsx            # Client：全屏查看器
 │   │   ├── LightboxProvider.tsx    # Client：全局 Lightbox 状态
+│   │   ├── PhotoLightboxTrigger.tsx # Client：嵌入 PhotoCard 的最小点击触发器
 │   │   └── Lightbox.module.css
 │   └── Footer/
 │       ├── Footer.tsx
@@ -109,7 +113,8 @@ frontend/
 **与建议结构的差异说明：**
 
 - `PhotoStream` 拆为「Server 渲染轨道 + Client 交互外壳」两层，避免整段照片列表被打包进客户端 JS
-- `Lightbox` 增加 `LightboxProvider`，因为它是跨组件的全局交互状态（详见 §12）
+- `Hero` 拆为「Server 结构 + Client `HeroPicker`」两层：Server 渲染确定性 fallback 保证首屏不为空，`HeroPicker` 只在水合后做随机选择（详见 §7 Random Hero）
+- `Lightbox` 增加 `LightboxProvider`（跨组件全局状态）与 `PhotoLightboxTrigger`（嵌入 Server PhotoCard 的最小 Client 点击边界，详见 §12）
 - 不设独立 `styles/` 目录：`globals.css` 放 `app/` 下符合 Next.js 惯例，组件样式与组件共置（CSS Modules 的核心价值）
 
 **克制原则：** 不拆 `Button`、`Caption`、`SectionHead` 等过细组件；相同样式通过 CSS Module 内的类复用解决。
@@ -147,14 +152,16 @@ frontend/
 RootLayout (Server)
 ├── Header (Server)
 └── page.tsx (Server)
-    ├── Hero (Server)
-    │   └── HeroPhoto (next/image, priority)
+    ├── Hero (Server)                     # 结构 + 确定性 fallback
+    │   └── HeroPicker (Client)           # 水合后随机选择（见 §7）
     ├── PhotoStream (Client 外壳)
     │   └── PhotoStreamTrack (Server children)
     │       └── PhotoCard × N (Server)
+    │           └── PhotoLightboxTrigger (Client 叶子)
     ├── TimelineArchive (Server)
     │   └── TimelineSection × Year (Server)
     │       └── PhotoCard × N (Server, layoutVariant)
+    │           └── PhotoLightboxTrigger (Client 叶子)
     ├── LightboxProvider (Client)
     │   └── Lightbox (Client, 按需渲染)
     └── Footer (Server)
@@ -162,10 +169,11 @@ RootLayout (Server)
 
 **关键设计决策：**
 
-1. **PhotoCard 是展示组件，不是交互组件。** 它渲染图片与 caption，点击行为通过 LightboxProvider 的 context 注册，无需为每张卡片创建客户端闭包。
-2. **数据分组在服务端完成。** `TimelineArchive` 调用 `groupByTime.ts` 将 `Photo[]` 转为 `ArchiveYear[]`，客户端不重复计算。
-3. **布局变体在渲染时确定。** `TimelineSection` 根据照片数量与 `orientation` 为每张卡片分配变体（见 §10），不依赖 CSS `nth-child` hack。
-4. **Header / Footer 是 Server Component。** V1 无交互导航（无移动端汉堡菜单动画需求时），纯静态渲染。
+1. **PhotoCard 保持 Server Component，不直接触碰 Client Context。** Server Component 不能使用 Client Context、不能绑定浏览器 `onClick`、不能调用 Client Provider state。因此点击行为由嵌入卡片内部的薄 Client 叶子 `PhotoLightboxTrigger` 承担：PhotoCard 负责图片 / caption / 变体布局（Server 渲染、hover 纯 CSS），Trigger 只接收打开 Lightbox 所需的最小数据并调用 `LightboxProvider`（详见 §12）。Timeline 与照片数据逻辑不因此变成 Client。
+2. **Hero 随机是 presentation randomness，不是 data randomness。** Server 获取 featured 池并渲染确定性 fallback，`HeroPicker` 在水合后随机切换（详见 §7）。Hero / Homepage / `page.tsx` 均不因此变成 Client Component。
+3. **数据分组在服务端完成。** Homepage 优先消费后端 `ArchiveResponse`（已分组）；降级时才由 `groupByTime.ts` 在服务端自行分组，客户端不重复计算。
+4. **布局变体在渲染时确定。** `TimelineSection` 根据照片数量与 `orientation` 为每张卡片分配变体（见 §10），不依赖 CSS `nth-child` hack。
+5. **Header / Footer 是 Server Component。** V1 无交互导航（无移动端汉堡菜单动画需求时），纯静态渲染。
 
 ---
 
@@ -178,16 +186,18 @@ RootLayout (Server)
 | `app/page.tsx` | 数据获取、结构组装 |
 | `app/about/page.tsx` | 纯静态内容 |
 | `Header` / `Footer` | 无交互 |
-| `Hero` | 数据在服务端选取（随机 featured），图片用 `next/image` 渲染 |
+| `Hero` | 结构在服务端渲染，featured 池在服务端获取，确定性 fallback 直出 HTML |
 | `PhotoStreamTrack` | 照片列表 HTML 由服务端输出 |
 | `TimelineArchive` / `TimelineSection` | 分组、变体分配、渲染全部在服务端 |
-| `PhotoCard` | 展示组件，hover 效果由纯 CSS 实现 |
+| `PhotoCard` | 展示组件，hover 效果由纯 CSS 实现；不含 onClick / context |
 
 ### Client Components（`"use client"`，最小化）
 
 | 模块 | 必须客户端的理由 |
 |------|------------------|
+| `HeroPicker` | 水合后从 featured 池随机选择一张照片（client-side presentation randomness） |
 | `PhotoStream`（外壳） | wheel 事件转换、pointer drag、自动漂移、`prefers-reduced-motion` 检测 |
+| `PhotoLightboxTrigger` | Server PhotoCard 无法绑定 onClick / 使用 Client Context，需要最小 Client 叶子转发点击到 `LightboxProvider` |
 | `LightboxProvider` | 全局 Lightbox 开关状态、当前索引 |
 | `Lightbox` | 键盘导航（←/→/Esc）、触摸 swipe、focus 管理、焦点归还 |
 
@@ -195,6 +205,7 @@ RootLayout (Server)
 
 - `"use client"` 只标在叶子交互节点，**绝不在 `page.tsx` 或布局级标记**
 - Client 外壳通过 `children` 接收 Server 渲染的内容（composition pattern），照片列表不进客户端 bundle
+- Client 叶子（`HeroPicker` / `PhotoLightboxTrigger`）只接收可序列化的最小 props（如照片 id 列表 / 当前照片数据），不反向把数据逻辑拉进客户端
 - hover 放大 / opacity 变化是 CSS `:hover`，不是 React state
 
 ---
@@ -215,78 +226,122 @@ RootLayout (Server)
 
 - 前端**只**通过 REST API 获取数据，绝不直连 PostgreSQL
 - 前端**不持有** Cloudinary API Secret，不参与上传签名
-- 图片 URL 由后端 DTO 直接给出（后端可返回已构造好的 Cloudinary delivery URL 或多尺寸 URL 集）
+- 图片 URL 由后端 DTO 直接给出（固定 variant：`thumbnailUrl` / `cardUrl` / `displayUrl`），前端不自行构造 transformation
 
-**消费 API：**
+**消费 API（契约以 `docs/TECHNICAL_DESIGN.md` §6.1 与 `docs/DATA_MODEL.md` §9–§10 为准）：**
+
+| Endpoint | 参数 | 响应 | 前端用途 |
+|----------|------|------|----------|
+| `GET /api/v1/photos` | `year?`, `month?`, `order=newest\|oldest`, `page=0`, `size=24`（max 100） | `PhotoPageResponse`（`items` + 分页字段） | 通用列表；`lib/api` 适配层解包 `items`，组件只接收 `PhotoSummary[]` |
+| `GET /api/v1/photos/featured` | `limit=12`（max 30），newest first | `PhotoSummaryResponse[]` | Hero 随机池（见下） |
+| `GET /api/v1/photos/{id}` | — | `PhotoResponse` | 完整详情，Lightbox 未来扩展用 |
+| `GET /api/v1/archive` | `year?` | `ArchiveResponse`（`years[]` 已按 Year → Month → Photos 分组） | **Homepage Timeline 的首选数据源** |
+
+**数据获取位置：** 全部在 Server Component 内通过 `lib/api/` 的封装函数完成。V1 无客户端数据请求（无 SWR / React Query）。公开响应不含 `visibility` / `cloudinaryPublicId` / 原始 URL，前端模型也不定义这些字段。
+
+**降级方案：** 若 `/api/v1/archive` 暂不可用，前端用 `lib/utils/groupByTime.ts` 在服务端自行分组——分组逻辑只写一次，两种来源都可用。
+
+### Random Hero：与 ISR 解耦
+
+**问题：** 若 Server Component 在页面生成时随机选择 Hero，ISR 缓存会让所有访问者在一段时间内看到同一张照片，不符合"不同访问 / 刷新出现不同照片"的产品期望。
+
+**方案——client-side presentation randomness（而非 server-side data randomness）：**
 
 ```text
-GET /api/v1/photos           → PhotoSummary[]        （通用列表）
-GET /api/v1/photos/featured  → PhotoSummary[]        （Hero 随机池）
-GET /api/v1/photos/{id}      → Photo                 （完整详情，Lightbox 未来扩展用）
-GET /api/v1/archive          → ArchiveYear[]         （已按时间分组，优先方案）
+Server
+  ↓ fetch GET /api/v1/photos/featured（featured 池，可随 ISR 缓存）
+  ↓ 渲染确定性 fallback Hero（例如池中第一张，首屏不为空、无闪烁）
+Client HeroPicker
+  ↓ hydration 完成后，从 featuredPhotos props 中随机选择一张
+  ↓ 若为 fallback 同一张则无操作；否则平滑切换图片与 caption
 ```
 
-**数据获取位置：** 全部在 Server Component 内通过 `lib/api/` 的封装函数完成。V1 无客户端数据请求（无 SWR / React Query）。
-
-**降级方案：** 若 `/api/v1/archive` 后端未按分组返回，前端用 `lib/utils/groupByTime.ts` 在服务端自行分组——分组逻辑只写一次，两种来源都可用。
+- **缓存与随机展示解耦：** ISR 缓存的是"featured 池"这份数据与 fallback HTML；随机发生在每个访问者的浏览器里，不影响缓存语义
+- **`HeroPicker` 是极轻 Client Component：** 只接收可序列化的 `featuredPhotos: PhotoSummary[]`，只负责初始化时的一次随机选择，不处理 hover、不处理路由
+- **Hero / Homepage / `page.tsx` 均不因此变成 Client Component**；Timeline / Archive 继续使用 ISR 不受影响
+- **空池降级：** featured 池为空时，fallback 回退到 archive 中最新一张照片
 
 **加载与错误策略（V1 从简）：**
 
 - API 不可用时渲染静态错误文案，不做骨架屏系统
-- Hero featured 为空池时回退到任意照片
+- HeroPicker 随机切换使用 CSS opacity 过渡（≤ 600ms，遵循 `--ease-out`），不做复杂转场
 
 ---
 
 ## 8. TypeScript Models
 
-`types/photo.ts` —— 只定义前端消费 API 所需的 shape，数据库结构由后端决定：
+`types/photo.ts` —— 与后端正式响应 DTO（`docs/DATA_MODEL.md` §9.2 / §9.3 / §10）一一对齐，数据库结构由后端决定：
 
 ```typescript
-/** 列表与归档场景使用的精简照片对象 */
-export interface PhotoSummary {
-  id: string;
-  imageUrl: string;            // Cloudinary delivery URL（由后端给出）
-  title: string;
-  takenAt: string;             // ISO 8601，例如 "2026-08-14"
-  year: number;
-  month: number;               // 1–12，前端负责格式化为 "AUGUST"
-  location: string | null;
-  orientation: "landscape" | "portrait" | "square";
-  aspectRatio: number;         // width / height，用于防 CLS 与布局变体
-  featured: boolean;
+/** 后端给出的固定规格衍生图 URL 集（对应 PhotoSummaryResponse.image） */
+export interface PhotoImage {
+  thumbnailUrl: string;        // 极小预览 / 未来缩略图用途
+  cardUrl: string;             // Timeline Archive / Horizontal Stream
+  displayUrl: string;          // Hero / Lightbox
 }
 
-/** 完整照片对象（详情 / 未来 EXIF 扩展） */
+/** 列表、归档、Stream、Lightbox 导航使用的精简照片对象（对应 PhotoSummaryResponse） */
+export interface PhotoSummary {
+  id: string;                  // UUID
+  title: string;
+  takenAt: string;             // ISO 8601 日期，例如 "2026-08-14"
+  year: number;                // 后端派生字段
+  month: number;               // 1–12，后端派生字段
+  location: string | null;
+  orientation: "landscape" | "portrait" | "square";
+  aspectRatio: number;         // width / height，后端派生，用于防 CLS 与布局变体
+  featured: boolean;
+  image: PhotoImage;
+}
+
+/** 完整照片对象（对应 PhotoResponse；详情 / 未来 EXIF 展示） */
 export interface Photo extends PhotoSummary {
   description: string | null;
   camera: string | null;
   lens: string | null;
-  aperture: string | null;
-  shutterSpeed: string | null;
+  focalLength: string | null;  // 后端已格式化，例如 "35 mm"
+  aperture: string | null;     // 后端已格式化，例如 "f/2.8"
+  shutterSpeed: string | null; // 后端已格式化，例如 "1/250 s"
   iso: number | null;
-  focalLength: string | null;
-  tags: string[];
 }
 
-/** 时间归档：Year → Month → Photos */
+/** 时间归档（对应 ArchiveResponse；Year → Month → Photos） */
 export interface ArchiveMonth {
   month: number;               // 1–12
-  label: string;               // "AUGUST"
+  label: string;               // 后端给出，稳定大写英文月名，例如 "AUGUST"
+  photoCount: number;
   photos: PhotoSummary[];
 }
 
 export interface ArchiveYear {
   year: number;
-  months: ArchiveMonth[];      // 12 → 1 降序
   photoCount: number;          // "N FRAMES" 角标
+  months: ArchiveMonth[];      // 12 → 1 降序
+}
+
+export interface ArchiveResponse {
+  years: ArchiveYear[];        // 年份降序；空年 / 空月由后端省略
+}
+
+/** GET /api/v1/photos 的分页信封（对应 PhotoPageResponse） */
+export interface PhotoPage {
+  items: PhotoSummary[];
+  page: number;                // zero-based
+  size: number;
+  totalElements: number;
+  totalPages: number;
 }
 ```
 
 **设计说明：**
 
-- `visibility` 字段**不在前端模型中**——它是后端的过滤条件，不通过 wire 传输到公开前端
-- `aspectRatio` 由后端计算给出（或从 Cloudinary URL 元数据推导），前端不读图片文件
-- 空值显式建模为 `| null`，避免组件内散落可选链判断
+- `image` 是后端契约的核心形状：不同视觉场景消费不同 variant（使用约定见 §9.2），前端**不再使用单一 `imageUrl`**
+- `visibility` / `cloudinaryPublicId` / 原始 URL **不在前端模型中**——它们是后端内部字段，公开响应不返回
+- `year` / `month` / `orientation` / `aspectRatio` 均为后端派生响应字段，前端不读图片文件、不自行计算
+- 月份 `label` 由后端提供（语义值仍是数字 `month`），前端不做格式化
+- EXIF 字段以后端格式化字符串传输（如 `"f/2.8"`），前端直接展示，不做单位换算
+- 空值显式建模为 `| null`，与后端"nullable 显式返回 JSON null"的约定一致
+- V1 无 `tags` 字段（后端明确不在 V1 建模）；未来扩展时随后端契约一并加入
 
 ---
 
@@ -300,11 +355,28 @@ export interface ArchiveYear {
 | Photo Stream | 首屏可视区内图片正常加载，可视区外 `loading="lazy"` |
 | Timeline Archive | 全部 `loading="lazy"`，滚动进入视口再加载 |
 
-### 9.2 技术方案
+### 9.2 Variant 使用约定与技术方案
 
-- 统一使用 `next/image`，配置 Cloudinary 自定义 loader（只做 URL 变换，不涉及密钥）
-- `sizes` 属性按组件实际渲染宽度精确声明（如 Hero `45vw`、Archive wide 变体 `46vw`）
+后端 DTO 的 `image` 提供三档固定规格（对齐 `docs/TECHNICAL_DESIGN.md` §8.1），前端按视觉场景选择对应 variant：
+
+| Variant | 上限 | 前端使用场景 |
+|---------|------|--------------|
+| `thumbnailUrl` | ~480px | 极小预览 / 未来缩略图用途（V1 公开页面基本不使用） |
+| `cardUrl` | ~1280px | Timeline Archive 卡片、Horizontal Photo Stream |
+| `displayUrl` | ~2048px | Hero、Lightbox 大图 |
+
+**技术方案：**
+
+- 直接使用后端给出的 variant URL；**不使用 `next/image` 的自定义 loader 去构造任意 Cloudinary 变换**（与后端 Strict Transformations 契约冲突）。需要框架优化时以 `next/image` + `unoptimized` 或原生 `<img>` 承载，语义等价
+- `sizes` 概念仍成立：CSS 按组件实际渲染宽度精确控制展示尺寸（如 Hero `45vw`、Archive wide 变体 `46vw`），variant 分辨率冗余由后端规格保证
 - 每张图片**必须**预留宽高空间：优先使用 `aspect-ratio` CSS 属性 + `width: 100%`，由 `PhotoSummary.aspectRatio` 驱动，杜绝 CLS
+
+**前端禁止事项（安全契约）：**
+
+- 不得自行构造任意 Cloudinary transformation URL
+- 不得获取 Cloudinary API Secret / 上传签名
+- 不得获取原始图 URL
+- 不得获取 `cloudinaryPublicId`
 
 ### 9.3 裁切原则（尊重原始构图）
 
@@ -319,8 +391,9 @@ export interface ArchiveYear {
 
 ### 9.4 图片保护对齐 PRD
 
-- 前端只请求展示尺寸（最大约 2000px 宽），不暴露原图 URL
-- `next/image` 代理输出，原始 Cloudinary 路径结构不直接出现在 HTML 中
+- 前端只渲染后端给出的固定 variant（最大 display 约 2048px 宽），原图为 Cloudinary private delivery，不进入公开 DTO
+- 安全边界由后端 Strict Transformations + 固定 `MediaUrlFactory` 保证；前端不构造 URL，自然无法越界取图
+- 已展示的衍生图可被复制是既定前提，保护目标是原图私有与分辨率受限，而非假装浏览器能藏住已渲染资源
 
 ---
 
@@ -400,15 +473,27 @@ PhotoStream.tsx          "use client" —— 交互外壳
 
 ## 12. Lightbox Architecture
 
-### 12.1 状态模型
+### 12.1 Server–Client 边界：PhotoLightboxTrigger
+
+Server PhotoCard 不能绑定 `onClick`、不能使用 Client Context，因此点击打开 Lightbox 通过一个薄 Client 叶子组件完成：
 
 ```text
-LightboxProvider ("use client", 挂在 Homepage 叶级)
-  state: { photos: PhotoSummary[], index: number } | null
+PhotoCard (Server)
+   │  渲染 image / caption / metadata，hover 放大纯 CSS
+   │
+   └── PhotoLightboxTrigger ("use client")
+             │  props：可序列化的最小数据（listPhotos 的 id 集 + 当前 index，
+             │        或当前 PhotoSummary）
+             │  onClick → 调用 LightboxProvider 的 open()
+             ▼
+       LightboxProvider ("use client", 挂在 Homepage 叶级)
+             state: { photos: PhotoSummary[], index: number } | null
 ```
 
-- 任何 PhotoCard 点击 → `open(photos, index)`，携带**当前所在列表**（Stream 或某个月份组），Previous/Next 在该列表内循环
-- `null` 时不渲染 Lightbox DOM，零运行时成本
+- **Trigger 只做最小必要交互：** 接收点击、转发给 Provider；不包含图片渲染、不做 hover、不做数据获取
+- **PhotoCard / Timeline / Stream 保持 Server：** 不因点击行为把整段照片数据逻辑变成 Client Component；Trigger 是每张照片唯一的客户端 JS 成本（极薄）
+- **Provider 状态模型：** `open(photos, index)` 携带**当前所在列表**（Stream 或某个月份组），Previous/Next 在该列表内循环；`null` 时不渲染 Lightbox DOM，零运行时成本
+- 实现上 Trigger 也可渲染为卡片上方的透明 `<button>`（满足 §15 键盘可达与 focus 样式要求）
 
 ### 12.2 功能（对齐 PRD §11）
 
@@ -431,7 +516,7 @@ LightboxProvider ("use client", 挂在 Homepage 叶级)
 ### 12.5 Focus 管理（Accessibility 要求）
 
 - 打开：focus 移至 Lightbox 容器（`tabIndex={-1}`），focus trap 在内部
-- 关闭：focus 归还到触发它的 PhotoCard
+- 关闭：focus 归还到触发它的 `PhotoLightboxTrigger`
 - `role="dialog"` + `aria-modal="true"` + `aria-label={photo.title}`
 
 ---
@@ -514,7 +599,7 @@ tokens 直接继承 Prototype 已验证的色板与动效曲线。
 |------|------|
 | alt text | `PhotoSummary.title`（无 title 时用 `"Untitled photograph, {location}, {year}"`） |
 | 语义 HTML | header / main / section / figure / figcaption / footer / nav |
-| 键盘导航 | 全站 Tab 可达；PhotoCard 用 `<button>` 包裹或以 button 语义触发 Lightbox |
+| 键盘导航 | 全站 Tab 可达；`PhotoLightboxTrigger` 以 `<button>` 语义承载（见 §12.1），原生支持 Enter / Space 触发 |
 | focus state | 保留 `:focus-visible` 轮廓（定制为细线 ink 色，不用 outline: none） |
 | Lightbox | focus trap + Esc + 焦点归还（见 §12.5） |
 | reduced motion | 关闭自动漂移、入场动画、hover 放大（保留透明度提示） |
@@ -529,13 +614,13 @@ tokens 直接继承 Prototype 已验证的色板与动效曲线。
 
 ### 16.1 图片（最大收益项）
 
-- Hero `priority` 预加载；其余全部 lazy（见 §9.1）
+- Hero `priority` 预加载（display variant）；其余全部 lazy（见 §9.1）
 - `aspect-ratio` 预留空间，目标 CLS = 0
-- `next/image` 按 `sizes` 生成 srcset，移动设备不下载桌面尺寸
+- 按场景选 variant：移动/卡片场景只下载 card（≤1280px），不下载 display（≤2048px）
 
 ### 16.2 JavaScript 最小化
 
-- Server Components 为默认；客户端 JS 只来自 PhotoStream 外壳 + Lightbox（合计目标 < 15KB gzip，不含框架）
+- Server Components 为默认；客户端 JS 只来自 `HeroPicker` + `PhotoStream` 外壳 + `PhotoLightboxTrigger` × N + Lightbox（合计目标 < 15KB gzip，不含框架）
 - App Router 天然 route-level code splitting：`/about` 几乎零 JS
 - 无客户端数据请求库、无状态管理库、无动画框架
 
@@ -587,13 +672,13 @@ tokens 直接继承 Prototype 已验证的色板与动效曲线。
 |------|----------------|-----------|
 | Data loading | `mockPhotos.js` 全局常量 | Server Component 内 fetch REST API + ISR |
 | DOM 渲染 | `innerHTML` 字符串拼接 | React 组件 + TypeScript 类型约束 |
-| Archive 分组 | 客户端运行时分组 | 服务端分组（API 或 `groupByTime.ts`） |
+| Archive 分组 | 客户端运行时分组 | 服务端分组（优先消费 `ArchiveResponse`，降级 `groupByTime.ts`） |
 | 布局变体 | `archive-card--0/1/2/3` 序号循环 | 语义化 Layout Variant 分配算法（§10） |
-| 图片 | 原生 `<img>`，无尺寸预留 | `next/image` + aspect-ratio 预留 + srcset |
+| 图片 | 原生 `<img>`，无尺寸预留 | 后端固定 variant URL + aspect-ratio 预留（§9） |
 | Responsive | 单一 860px 断点 | 3 档断点策略（§14） |
 | Accessibility | 未考虑 | §15 全量方案 |
-| Lightbox | 不存在 | §12 新架构 |
-| Hero 随机 | 客户端 `Math.random()`（有闪烁） | 服务端选取，HTML 直出 |
+| Lightbox | 不存在 | §12 新架构（Server PhotoCard + Client Trigger） |
+| Hero 随机 | 客户端 `Math.random()`（有闪烁、无缓存意识） | 服务端确定性 fallback 直出 + `HeroPicker` 水合后随机（client-side presentation randomness，与 ISR 解耦，§7） |
 
 ### 18.3 Prototype 的处理
 
@@ -609,9 +694,10 @@ tokens 直接继承 Prototype 已验证的色板与动效曲线。
 
 - **路由预留：** `/admin` 段未来挂在 `app/admin/` 下，与公开站共享 layout 体系但使用独立 layout 文件（公开站 Header/Footer 不适用于 Admin）
 - **SEO 隔离：** `robots.ts` 中对 `/admin` disallow
-- **类型预留：** `Photo.visibility` 未来由后端管理，公开 API 不返回；Admin API 可复用 `types/photo.ts` 并扩展
+- **API 预留：** 后端已保留 `/api/v1/admin/*`（session / photos / uploads signature，见 `docs/TECHNICAL_DESIGN.md` §6.2），届时浏览器请求使用 `credentials: "include"` + CSRF 握手，V1 前端不写任何相关代码
+- **类型预留：** `visibility` / `cloudinaryPublicId` 由后端 `AdminPhotoResponse` 管理，公开类型中不存在；Admin 类型在未来单独定义，不污染公开 `types/photo.ts`
 - **组件隔离：** Admin 组件放 `components/admin/`，不与展示组件混用——Admin 允许是"实用 UI"，公开站必须 `Photography First`
-- **认证边界：** 认证由后端 Session / Token 方案决定，前端届时在 `app/admin/layout.tsx` 做守卫，V1 不预设方案
+- **认证边界：** 认证由后端 Session 方案决定，前端届时在 `app/admin/layout.tsx` 做守卫，V1 不预设方案
 
 ---
 
