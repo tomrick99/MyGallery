@@ -81,6 +81,7 @@
 }
 
 .frame {
+  position: relative; /* anchor for the lightbox trigger overlay */
   overflow: hidden;
 }
 

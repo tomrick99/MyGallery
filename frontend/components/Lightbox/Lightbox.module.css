@@ -1,0 +1,141 @@
+/* ============================================================
+   Lightbox — quiet fullscreen viewer + card trigger
+   ============================================================ */
+
+/* ---------- trigger (over a PhotoCard frame) ---------- */
+
+.trigger {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.trigger:focus-visible {
+  outline: 1px solid var(--color-text);
+  outline-offset: -1px;
+}
+
+/* ---------- overlay ---------- */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 5vh 5vw;
+  background: rgba(18, 17, 16, 0.94);
+  animation: lightboxFade 260ms var(--ease-editorial);
+}
+
+.dialog {
+  max-width: 100%;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  outline: none;
+  animation: lightboxIn 320ms var(--ease-editorial);
+}
+
+.figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 0;
+}
+
+.image {
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 76vh; /* contain: full composition always visible */
+}
+
+.caption {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 24px;
+  margin-top: 18px;
+  font-size: 10px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(245, 243, 238, 0.72);
+}
+
+.close {
+  position: fixed;
+  top: 28px;
+  right: 32px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  font-size: 11px;
+  letter-spacing: 0.24em;
+  color: rgba(245, 243, 238, 0.72);
+  cursor: pointer;
+  transition: color 0.3s var(--ease-editorial);
+}
+
+.close:hover {
+  color: #f5f3ee;
+}
+
+.close:focus-visible {
+  outline: 1px solid #f5f3ee;
+  outline-offset: 4px;
+}
+
+@keyframes lightboxFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes lightboxIn {
+  from {
+    opacity: 0;
+    transform: scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ---------- reduced motion ---------- */
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .dialog,
+  .close {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ---------- mobile ---------- */
+
+@media (max-width: 860px) {
+  .backdrop {
+    padding: 4vh 4vw;
+  }
+
+  .image {
+    max-height: 70vh;
+  }
+
+  .close {
+    top: 16px;
+    right: 20px;
+    padding: 12px 8px; /* comfortable tap target */
+  }
+}

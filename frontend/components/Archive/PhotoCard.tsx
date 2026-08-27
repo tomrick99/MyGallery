@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { PhotoSummary } from "@/types/photo";
 import type { ArchiveVariant } from "@/lib/photos/layoutVariant";
+import PhotoLightboxTrigger from "@/components/Lightbox/PhotoLightboxTrigger";
 import styles from "./Archive.module.css";
 
 /**
@@ -37,6 +38,16 @@ export default function PhotoCard({
           sizes="(max-width: 860px) 100vw, 52vw"
           loading="lazy"
           className={styles.image}
+        />
+        <PhotoLightboxTrigger
+          photo={{
+            id: photo.id,
+            title: photo.title,
+            location: photo.location,
+            takenAt: photo.takenAt,
+            aspectRatio: photo.aspectRatio,
+            displayUrl: photo.image.displayUrl,
+          }}
         />
       </div>
       <figcaption className={styles.caption}>
