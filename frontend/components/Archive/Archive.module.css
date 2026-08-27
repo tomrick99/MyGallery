@@ -77,7 +77,7 @@
 }
 
 .card {
-  transition: opacity 0.5s var(--ease-editorial);
+  /* opacity intentionally static — hover affects only the photo's scale */
 }
 
 .frame {
@@ -132,14 +132,6 @@
 /* ---------- hover (desktop only, restrained) ---------- */
 
 @media (hover: hover) {
-  .grid:hover .card {
-    opacity: 0.7;
-  }
-
-  .grid .card:hover {
-    opacity: 1;
-  }
-
   .grid .card:hover .image {
     transform: scale(1.03);
   }
@@ -148,7 +140,6 @@
 /* ---------- reduced motion ---------- */
 
 @media (prefers-reduced-motion: reduce) {
-  .card,
   .image {
     transition: none;
   }
