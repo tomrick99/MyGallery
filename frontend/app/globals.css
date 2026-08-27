@@ -1,0 +1,73 @@
+/* ============================================================
+   MyGallery — Global Foundation
+   Reset + Design Tokens + Base Typography
+   Component visuals live in *.module.css next to each component.
+   ============================================================ */
+
+:root {
+  /* color */
+  --color-background: #f5f3ee;
+  --color-text: #1a1a18;
+  --color-muted: #6f6c65;
+
+  /* typography */
+  --font-serif: "Didot", "Bodoni MT", Georgia, "Times New Roman", serif;
+  --font-sans: "Helvetica Neue", Helvetica, Arial, "PingFang SC", sans-serif;
+
+  /* motion */
+  --ease-editorial: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ---------- reset ---------- */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ---------- base ---------- */
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  background: var(--color-background);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+input,
+button,
+textarea,
+select {
+  font: inherit;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-weight: inherit;
+  line-height: 1.2;
+  overflow-wrap: break-word;
+}
+
+p {
+  overflow-wrap: break-word;
+}

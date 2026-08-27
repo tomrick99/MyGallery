@@ -115,7 +115,7 @@ These documents are the source of truth for implementation. Agent-specific worki
 Step 1 — Visual Direction       ✅
 Step 2 — Product Definition     ✅
 Step 3 — Technical Design       ✅
-Step 4 — Repository Rules       🚧 complete in working tree; mark ✅ after commit
+Step 4 — Repository Rules       ✅
 Step 5 — Implementation         ⏳
 ```
 
