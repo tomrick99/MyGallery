@@ -30,6 +30,7 @@ import static org.hamcrest.Matchers.not;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -71,6 +72,7 @@ class AdminPhotoLifecycleIntegrationTests {
                 .andExpect(header().string(HttpHeaders.CACHE_CONTROL, "no-store"))
                 .andExpect(jsonPath("$.width").value(7200))
                 .andExpect(jsonPath("$.height").value(4800))
+                .andExpect(jsonPath("$.title").value("Verified Upload"))
                 .andExpect(jsonPath("$.visibility").value("PRIVATE"))
                 .andExpect(jsonPath("$.cloudinaryPublicId").doesNotExist())
                 .andExpect(jsonPath("$.originalUrl").doesNotExist())
@@ -109,6 +111,87 @@ class AdminPhotoLifecycleIntegrationTests {
                 .andExpect(jsonPath("$.width").doesNotExist())
                 .andExpect(jsonPath("$.height").doesNotExist())
                 .andExpect(jsonPath("$.originalUrl").doesNotExist());
+    }
+
+    @Test
+    void createAcceptsNullAndBlankTitlesAndReturnsExplicitNull() throws Exception {
+        CsrfSession admin = adminCsrf();
+        InMemoryPhotoAssetGateway assets = assets();
+
+        String nullTitleAsset = publicId("10000000-1000-4000-8000-000000000009");
+        assets.register(validAsset(nullTitleAsset, 6000, 4000));
+        MvcResult nullTitleCreate = mockMvc.perform(post("/api/v1/admin/photos")
+                        .session(admin.session())
+                        .header(admin.headerName(), admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJson(nullTitleAsset, "PUBLIC", false, false)
+                                .replace("\"title\": \"Verified Upload\"", "\"title\": null")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn();
+        String nullTitleId = JsonPath.read(
+                nullTitleCreate.getResponse().getContentAsString(),
+                "$.id"
+        );
+
+        mockMvc.perform(get("/api/v1/photos/{id}", nullTitleId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(org.hamcrest.Matchers.nullValue()));
+        MvcResult publicList = mockMvc.perform(get("/api/v1/photos"))
+                .andExpect(status().isOk())
+                .andReturn();
+        List<Object> matchingTitles = JsonPath.read(
+                publicList.getResponse().getContentAsString(),
+                "$[?(@.id == '" + nullTitleId + "')].title"
+        );
+        assertEquals(1, matchingTitles.size());
+        assertNull(matchingTitles.getFirst());
+
+        String blankTitleAsset = publicId("10000000-1000-4000-8000-000000000010");
+        assets.register(validAsset(blankTitleAsset, 4000, 6000));
+        MvcResult blankTitleCreate = mockMvc.perform(post("/api/v1/admin/photos")
+                        .session(admin.session())
+                        .header(admin.headerName(), admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createJson(blankTitleAsset, "PRIVATE", false, false)
+                                .replace("Verified Upload", "   ")))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.title").value(org.hamcrest.Matchers.nullValue()))
+                .andReturn();
+        String blankTitleId = JsonPath.read(
+                blankTitleCreate.getResponse().getContentAsString(),
+                "$.id"
+        );
+
+        mockMvc.perform(get("/api/v1/admin/photos/{id}", blankTitleId)
+                        .session(admin.session()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    void createStillRejectsOverlongTitlesAndMissingTakenAt() throws Exception {
+        CsrfSession admin = adminCsrf();
+        String cloudinaryPublicId = publicId("10000000-1000-4000-8000-000000000011");
+        String valid = createJson(cloudinaryPublicId, "PRIVATE", false, false);
+
+        mockMvc.perform(post("/api/v1/admin/photos")
+                        .session(admin.session())
+                        .header(admin.headerName(), admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(valid.replace("Verified Upload", "x".repeat(201))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        mockMvc.perform(post("/api/v1/admin/photos")
+                        .session(admin.session())
+                        .header(admin.headerName(), admin.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(valid.replace("  \"takenAt\": \"2026-08-20\",\n", "")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_FAILED"));
+
+        assertFalse(adminPhotoRepository.existsByCloudinaryPublicId(cloudinaryPublicId));
     }
 
     @Test

@@ -390,7 +390,7 @@ All controllers use one error contract:
   "path": "/api/v1/admin/photos",
   "requestId": "01J6...",
   "fieldErrors": [
-    { "field": "title", "code": "NotBlank", "message": "must not be blank" }
+    { "field": "title", "code": "Size", "message": "size must be between 0 and 200" }
   ]
 }
 ```

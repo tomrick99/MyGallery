@@ -26,6 +26,7 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -134,6 +135,32 @@ class PostgresAdminPhotoRepositoryTests {
     }
 
     @Test
+    void updateAllowsAnExistingPhotoTitleToBeCleared() {
+        PhotoEntity entity = privatePhotoEntity();
+        findByIdResult = Optional.of(entity);
+        AdminPhotoUpdate update = new AdminPhotoUpdate(
+                null,
+                LocalDate.of(2026, 8, 28),
+                "Tianjin",
+                true,
+                PhotoVisibility.PRIVATE,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null,
+                null
+        );
+
+        Photo result = adminPhotoRepository.update(PHOTO_ID, update).orElseThrow();
+
+        assertNull(result.title());
+        assertNull(entity.getTitle());
+        assertEquals(LocalDate.of(2026, 8, 28), result.takenAt());
+    }
+
+    @Test
     void updateReturnsEmptyForAnUnknownPhoto() {
         Optional<Photo> result = adminPhotoRepository.update(
                 PHOTO_ID,
@@ -158,14 +185,14 @@ class PostgresAdminPhotoRepositoryTests {
     }
 
     @Test
-    void createPersistsVerifiedAssetIdentityAndDimensions() {
+    void createPersistsVerifiedAssetIdentityDimensionsAndNullTitle() {
         UUID createdId = UUID.fromString("30000000-0000-4000-8000-000000000002");
         AdminPhotoCreate create = new AdminPhotoCreate(
                 createdId,
                 "mygallery/originals/verified-asset",
                 7200,
                 4800,
-                "Verified Persistence Upload",
+                null,
                 LocalDate.of(2026, 8, 20),
                 "Tianjin",
                 false,
@@ -184,6 +211,8 @@ class PostgresAdminPhotoRepositoryTests {
         assertEquals(createdId, result.id());
         assertEquals(7200, result.width());
         assertEquals(4800, result.height());
+        assertNull(result.title());
+        assertNull(savedEntity.getTitle());
         assertEquals(create.cloudinaryPublicId(), savedEntity.getCloudinaryPublicId());
         assertEquals(PhotoVisibility.PRIVATE, savedEntity.getVisibility());
     }

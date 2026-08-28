@@ -226,12 +226,40 @@ class AdminPhotoControllerTests {
 
     @Test
     @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
+    void updateCanClearTitleWithNullOrWhitespace() throws Exception {
+        CsrfSession admin = loginSuccessfully();
+        CsrfSession csrf = refreshCsrf(admin.session());
+
+        mockMvc.perform(put("/api/v1/admin/photos/{id}", PUBLIC_PHOTO_ID)
+                        .session(csrf.session())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateJson("PUBLIC")
+                                .replace("\"Managed Title\"", "null")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(org.hamcrest.Matchers.nullValue()));
+
+        mockMvc.perform(get("/api/v1/photos/{id}", PUBLIC_PHOTO_ID))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(org.hamcrest.Matchers.nullValue()));
+
+        mockMvc.perform(put("/api/v1/admin/photos/{id}", PUBLIC_PHOTO_ID)
+                        .session(csrf.session())
+                        .header(csrf.headerName(), csrf.token())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(validUpdateJson("PUBLIC")
+                                .replace("Managed Title", "   ")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.title").value(org.hamcrest.Matchers.nullValue()));
+    }
+
+    @Test
+    @DirtiesContext(methodMode = DirtiesContext.MethodMode.AFTER_METHOD)
     void invalidUpdatesReturnFieldErrorsAndNeverPartiallyMutate() throws Exception {
         CsrfSession admin = loginSuccessfully();
         CsrfSession csrf = refreshCsrf(admin.session());
         String valid = validUpdateJson("PRIVATE");
         List<String> invalidRequests = List.of(
-                valid.replace("\"Managed Title\"", "\"   \""),
                 valid.replace("\"Managed Title\"", "\"" + "x".repeat(201) + "\""),
                 valid.replace("\"takenAt\": \"2026-08-01\",", ""),
                 valid.replace("2026-08-01", "2999-01-01"),

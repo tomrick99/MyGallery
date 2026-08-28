@@ -12,7 +12,7 @@ import java.time.LocalDate;
 
 public record AdminPhotoCreateRequest(
         @NotBlank @Size(max = 255) String cloudinaryPublicId,
-        @NotBlank @Size(max = 200) String title,
+        @Size(max = 200) String title,
         @NotNull @PastOrPresent LocalDate takenAt,
         @Size(max = 200) String location,
         boolean featured,
@@ -28,7 +28,7 @@ public record AdminPhotoCreateRequest(
 
     public AdminPhotoCreateRequest {
         cloudinaryPublicId = trim(cloudinaryPublicId);
-        title = trim(title);
+        title = normalizeOptional(title);
         location = normalizeOptional(location);
         visibility = visibility == null ? PhotoVisibility.PRIVATE : visibility;
         camera = normalizeOptional(camera);

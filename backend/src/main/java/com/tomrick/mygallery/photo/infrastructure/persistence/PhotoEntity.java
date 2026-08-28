@@ -26,9 +26,8 @@ class PhotoEntity {
     @Id
     private UUID id;
 
-    @NotBlank
     @Size(max = 200)
-    @Column(nullable = false, length = 200)
+    @Column(length = 200)
     private String title;
 
     @PastOrPresent

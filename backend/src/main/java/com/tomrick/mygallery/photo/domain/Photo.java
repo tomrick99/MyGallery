@@ -28,14 +28,13 @@ public record Photo(
 
     public Photo {
         Objects.requireNonNull(id, "id must not be null");
-        Objects.requireNonNull(title, "title must not be null");
         Objects.requireNonNull(takenAt, "takenAt must not be null");
         Objects.requireNonNull(visibility, "visibility must not be null");
         Objects.requireNonNull(thumbnailUrl, "thumbnailUrl must not be null");
         Objects.requireNonNull(cardUrl, "cardUrl must not be null");
         Objects.requireNonNull(displayUrl, "displayUrl must not be null");
 
-        if (title.isBlank()) {
+        if (title != null && title.isBlank()) {
             throw new IllegalArgumentException("title must not be blank");
         }
         if (width <= 0 || height <= 0) {

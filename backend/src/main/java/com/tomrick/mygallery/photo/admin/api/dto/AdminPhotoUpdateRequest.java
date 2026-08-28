@@ -1,7 +1,6 @@
 package com.tomrick.mygallery.photo.admin.api.dto;
 
 import com.tomrick.mygallery.photo.domain.PhotoVisibility;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Positive;
@@ -11,7 +10,7 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 
 public record AdminPhotoUpdateRequest(
-        @NotBlank @Size(max = 200) String title,
+        @Size(max = 200) String title,
         @NotNull @PastOrPresent LocalDate takenAt,
         @Size(max = 200) String location,
         @NotNull Boolean featured,
@@ -26,7 +25,7 @@ public record AdminPhotoUpdateRequest(
 ) {
 
     public AdminPhotoUpdateRequest {
-        title = trim(title);
+        title = normalizeOptional(title);
         location = normalizeOptional(location);
         camera = normalizeOptional(camera);
         lens = normalizeOptional(lens);
