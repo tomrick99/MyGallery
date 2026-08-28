@@ -9,7 +9,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
 
 @Component
-@Profile("postgres")
+@Profile("postgres & !cloudinary")
 final class DevelopmentPhotoImageUrlResolver implements PhotoImageUrlResolver {
 
     private static final String BASE_URL =
