@@ -1,5 +1,6 @@
 package com.tomrick.mygallery.photo.infrastructure;
 
+import com.tomrick.mygallery.photo.admin.domain.AdminPhotoRepository;
 import com.tomrick.mygallery.photo.domain.PhotoRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -18,11 +19,15 @@ class MemoryPersistenceProfileTests {
     private PhotoRepository photoRepository;
 
     @Autowired
+    private AdminPhotoRepository adminPhotoRepository;
+
+    @Autowired
     private ApplicationContext applicationContext;
 
     @Test
     void defaultProfileUsesMemoryRepositoryWithoutADataSource() {
         assertInstanceOf(InMemoryPhotoRepository.class, photoRepository);
+        assertInstanceOf(InMemoryPhotoRepository.class, adminPhotoRepository);
         assertTrue(applicationContext.getBeansOfType(DataSource.class).isEmpty());
     }
 }

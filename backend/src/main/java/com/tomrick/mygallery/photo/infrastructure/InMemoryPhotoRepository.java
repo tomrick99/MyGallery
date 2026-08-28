@@ -1,5 +1,8 @@
 package com.tomrick.mygallery.photo.infrastructure;
 
+import com.tomrick.mygallery.photo.admin.domain.AdminPhotoPage;
+import com.tomrick.mygallery.photo.admin.domain.AdminPhotoRepository;
+import com.tomrick.mygallery.photo.admin.domain.AdminPhotoUpdate;
 import com.tomrick.mygallery.photo.domain.Photo;
 import com.tomrick.mygallery.photo.domain.PhotoRepository;
 import com.tomrick.mygallery.photo.domain.PhotoVisibility;
@@ -8,18 +11,23 @@ import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 @Profile("memory")
-public class InMemoryPhotoRepository implements PhotoRepository {
+public class InMemoryPhotoRepository implements PhotoRepository, AdminPhotoRepository {
 
     private static final String DERIVATIVE_BASE_URL =
             "https://images.example.test/mygallery/development-derivatives/";
+    private static final Comparator<Photo> NEWEST_FIRST = Comparator
+            .comparing(Photo::takenAt, Comparator.reverseOrder())
+            .thenComparing(Photo::id, Comparator.reverseOrder());
 
-    private final List<Photo> photos = List.of(
+    private final List<Photo> photos = new ArrayList<>(List.of(
             photoWithMetadata(
                     "10000000-0000-0000-0000-000000000101",
                     "orange-steel-over-water",
@@ -137,25 +145,83 @@ public class InMemoryPhotoRepository implements PhotoRepository {
                     false,
                     PhotoVisibility.PRIVATE
             )
-    );
+    ));
 
     @Override
-    public List<Photo> findAllPublic() {
+    public synchronized List<Photo> findAllPublic() {
         return photos.stream()
                 .filter(InMemoryPhotoRepository::isPublic)
                 .toList();
     }
 
     @Override
-    public Optional<Photo> findPublicById(UUID id) {
+    public synchronized Optional<Photo> findPublicById(UUID id) {
         return photos.stream()
                 .filter(photo -> photo.id().equals(id))
                 .filter(InMemoryPhotoRepository::isPublic)
                 .findFirst();
     }
 
+    @Override
+    public synchronized AdminPhotoPage findPage(int page, int size) {
+        List<Photo> sortedPhotos = photos.stream()
+                .sorted(NEWEST_FIRST)
+                .toList();
+        long offset = (long) page * size;
+        if (offset >= sortedPhotos.size()) {
+            return new AdminPhotoPage(List.of(), sortedPhotos.size());
+        }
+
+        int fromIndex = (int) offset;
+        int toIndex = Math.min(fromIndex + size, sortedPhotos.size());
+        return new AdminPhotoPage(sortedPhotos.subList(fromIndex, toIndex), sortedPhotos.size());
+    }
+
+    @Override
+    public synchronized Optional<Photo> findById(UUID id) {
+        return photos.stream()
+                .filter(photo -> photo.id().equals(id))
+                .findFirst();
+    }
+
+    @Override
+    public synchronized Optional<Photo> update(UUID id, AdminPhotoUpdate update) {
+        for (int index = 0; index < photos.size(); index++) {
+            Photo existing = photos.get(index);
+            if (existing.id().equals(id)) {
+                Photo updated = updatedPhoto(existing, update);
+                photos.set(index, updated);
+                return Optional.of(updated);
+            }
+        }
+        return Optional.empty();
+    }
+
     private static boolean isPublic(Photo photo) {
         return photo.visibility() == PhotoVisibility.PUBLIC;
+    }
+
+    private static Photo updatedPhoto(Photo existing, AdminPhotoUpdate update) {
+        return new Photo(
+                existing.id(),
+                update.title(),
+                update.takenAt(),
+                update.location(),
+                existing.width(),
+                existing.height(),
+                update.featured(),
+                update.visibility(),
+                existing.thumbnailUrl(),
+                existing.cardUrl(),
+                existing.displayUrl(),
+                update.camera(),
+                update.lens(),
+                update.focalLengthMm(),
+                update.aperture(),
+                update.shutterSpeedSeconds(),
+                update.iso(),
+                update.description()
+        );
     }
 
     private static Photo photo(

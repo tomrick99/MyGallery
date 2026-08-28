@@ -149,6 +149,34 @@ class PhotoEntity {
         updatedAt = Instant.now();
     }
 
+    void updateMetadata(
+            String title,
+            LocalDate takenAt,
+            String location,
+            boolean featured,
+            PhotoVisibility visibility,
+            String camera,
+            String lens,
+            BigDecimal focalLength,
+            BigDecimal aperture,
+            BigDecimal shutterSpeed,
+            Integer iso,
+            String description
+    ) {
+        this.title = title;
+        this.takenAt = takenAt;
+        this.location = location;
+        this.featured = featured;
+        this.visibility = visibility;
+        this.camera = camera;
+        this.lens = lens;
+        this.focalLength = focalLength;
+        this.aperture = aperture;
+        this.shutterSpeed = shutterSpeed;
+        this.iso = iso;
+        this.description = description;
+    }
+
     UUID getId() {
         return id;
     }
