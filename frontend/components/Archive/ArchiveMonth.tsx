@@ -1,4 +1,4 @@
-import type { ArchiveMonth as ArchiveMonthData } from "@/lib/photos/groupPhotosByTime";
+import type { ArchiveMonth as ArchiveMonthData } from "@/types/archive";
 import { assignArchiveVariants } from "@/lib/photos/layoutVariant";
 import PhotoCard from "./PhotoCard";
 import styles from "./Archive.module.css";

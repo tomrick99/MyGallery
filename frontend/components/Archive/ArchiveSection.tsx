@@ -1,18 +1,20 @@
-import { mockPhotos } from "@/lib/mock/photos";
-import { groupPhotosByTime } from "@/lib/photos/groupPhotosByTime";
+import type { ArchiveYear as ArchiveYearData } from "@/types/archive";
 import ArchiveYear from "./ArchiveYear";
 import styles from "./Archive.module.css";
 
 /**
  * ArchiveSection — Server Component.
  *
- * The Timeline Archive: Year → Month → Photos, newest first.
- * Entirely server-rendered; PhotoCard gains its thin client trigger only
- * when the Lightbox feature lands (Step 5.6).
+ * The Timeline Archive. Consumes the backend `GET /api/v1/archive` response
+ * directly — already grouped Year → Month → Photos and ordered newest
+ * first; no client-side regrouping or re-sorting. An empty archive is a
+ * valid state and renders nothing.
  */
-export default function ArchiveSection() {
-  const years = groupPhotosByTime(mockPhotos);
-
+export default function ArchiveSection({
+  years,
+}: {
+  years: ArchiveYearData[];
+}) {
   if (years.length === 0) return null;
 
   return (

@@ -1,19 +1,22 @@
-import { mockFeaturedPhotos } from "@/lib/mock/photos";
+import type { PhotoSummary } from "@/types/photo";
 import HeroPicker from "./HeroPicker";
 import styles from "./Hero.module.css";
 
 /**
  * Hero — Server Component.
  *
- * Fetches the featured pool (currently local mock data; later
- * `getFeaturedPhotos()` from lib/api) and renders the editorial structure.
- * The photograph itself is rendered by the thin HeroPicker client boundary,
- * which keeps server HTML deterministic (first pool entry as fallback) and
- * randomizes only after hydration — client-side presentation randomness.
+ * Receives the featured pool fetched by the homepage server component and
+ * renders the editorial structure. The photograph itself is rendered by the
+ * thin HeroPicker client boundary, which keeps server HTML deterministic
+ * (first pool entry as fallback) and randomizes only after hydration —
+ * client-side presentation randomness. An empty pool renders the text-only
+ * editorial state: no crash, no fake photograph.
  */
-export default function Hero() {
-  const featuredPhotos = mockFeaturedPhotos;
-
+export default function Hero({
+  featuredPhotos,
+}: {
+  featuredPhotos: PhotoSummary[];
+}) {
   return (
     <section className={styles.hero} aria-label="Featured photography">
       <div className={styles.text}>

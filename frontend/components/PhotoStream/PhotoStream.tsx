@@ -117,7 +117,10 @@ export default function PhotoStream({ children }: { children: ReactNode }) {
 
     let frame = 0;
     const drift = () => {
-      if (idle && !dragging && !motionQuery.matches) {
+      // Skip drift when the content is not scrollable (e.g. a single photo
+      // narrower than the viewport) so the accumulator stays sane.
+      const scrollable = el.scrollWidth > el.clientWidth;
+      if (idle && !dragging && !motionQuery.matches && scrollable) {
         position += DRIFT_PX_PER_FRAME;
         if (copyWidth > 0 && position >= copyWidth) position -= copyWidth;
         el.scrollLeft = position;

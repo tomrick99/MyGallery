@@ -1,4 +1,4 @@
-import type { ArchiveYear as ArchiveYearData } from "@/lib/photos/groupPhotosByTime";
+import type { ArchiveYear as ArchiveYearData } from "@/types/archive";
 import ArchiveMonth from "./ArchiveMonth";
 import styles from "./Archive.module.css";
 

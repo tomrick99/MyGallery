@@ -37,6 +37,7 @@ export default function PhotoCard({
           height={Math.round(INTRINSIC_WIDTH / photo.aspectRatio)}
           sizes="(max-width: 860px) 100vw, 52vw"
           loading="lazy"
+          unoptimized
           className={styles.image}
         />
         <PhotoLightboxTrigger

@@ -100,6 +100,7 @@ export default function Lightbox({
             height={Math.round(INTRINSIC_WIDTH / photo.aspectRatio)}
             className={styles.image}
             priority
+            unoptimized
           />
           <figcaption className={styles.caption}>
             <span>{photo.title}</span>

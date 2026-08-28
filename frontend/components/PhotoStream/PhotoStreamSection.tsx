@@ -1,4 +1,4 @@
-import { mockFeaturedPhotos } from "@/lib/mock/photos";
+import type { PhotoSummary } from "@/types/photo";
 import PhotoStream from "./PhotoStream";
 import PhotoStreamTrack from "./PhotoStreamTrack";
 import styles from "./PhotoStream.module.css";
@@ -6,14 +6,17 @@ import styles from "./PhotoStream.module.css";
 /**
  * PhotoStreamSection — Server Component.
  *
- * Section header + data + structure. The interactive shell (PhotoStream)
- * is a thin client boundary; the photo figures (PhotoStreamTrack) are
- * server-rendered and passed through as children, so the photo list never
- * enters the client bundle.
+ * Section header + data + structure. Receives the same featured pool the
+ * homepage already fetched for the Hero — no second request. The
+ * interactive shell (PhotoStream) is a thin client boundary; the photo
+ * figures (PhotoStreamTrack) are server-rendered and passed through as
+ * children, so the photo list never enters the client bundle.
  */
-export default function PhotoStreamSection() {
-  const photos = mockFeaturedPhotos;
-
+export default function PhotoStreamSection({
+  photos,
+}: {
+  photos: PhotoSummary[];
+}) {
   if (photos.length === 0) return null;
 
   return (

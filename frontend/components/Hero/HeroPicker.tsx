@@ -45,6 +45,7 @@ export default function HeroPicker({ photos }: { photos: PhotoSummary[] }) {
           alt={alt}
           fill
           priority
+          unoptimized
           sizes="(max-width: 860px) 100vw, 42vw"
           className={styles.image}
         />

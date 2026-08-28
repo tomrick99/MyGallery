@@ -1,30 +1,15 @@
 import type { PhotoSummary } from "@/types/photo";
+import type { ArchiveMonth, ArchiveYear } from "@/types/archive";
 
 /**
- * groupPhotosByTime — pure view-model grouping for the Timeline Archive.
+ * groupPhotosByTime — pure view-model grouping helper.
  *
- * Year → Month → Photos, all newest first:
- * - years descending
- * - months descending (12 → 1)
- * - photos within a month by takenAt descending
- *
- * Empty years/months simply never exist (no empty groups are rendered).
- * `year` / `month` are backend-derived response fields on PhotoSummary;
- * nothing here is persisted or remodeled.
+ * Retained only as a development/mock utility (the production homepage
+ * consumes the backend's pre-grouped `GET /api/v1/archive` response
+ * directly). Year → Month → Photos, all newest first; empty groups never
+ * exist. Types come from the shared contract in types/archive.ts — no
+ * duplicate definitions.
  */
-
-export interface ArchiveMonth {
-  month: number;
-  label: string;
-  photoCount: number;
-  photos: PhotoSummary[];
-}
-
-export interface ArchiveYear {
-  year: number;
-  photoCount: number;
-  months: ArchiveMonth[];
-}
 
 const MONTH_LABELS = [
   "JANUARY",

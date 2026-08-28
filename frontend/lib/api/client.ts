@@ -31,7 +31,12 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
     throw new ApiError("API_BASE_URL is not configured.", 0);
   }
 
-  const response = await fetch(`${API_BASE_URL}${path}`, {
+  // Robust join: tolerate a trailing slash in API_BASE_URL and never emit
+  // double slashes such as http://host//api/v1/archive.
+  const baseUrl = API_BASE_URL.replace(/\/+$/, "");
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  const response = await fetch(`${baseUrl}${normalizedPath}`, {
     headers: { Accept: "application/json", ...init?.headers },
     ...init,
   });

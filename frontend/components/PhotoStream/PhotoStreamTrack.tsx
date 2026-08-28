@@ -51,6 +51,7 @@ export default function PhotoStreamTrack({
                 src={photo.image.cardUrl}
                 alt={duplicate ? "" : alt}
                 fill
+                unoptimized
                 sizes="(max-width: 860px) 78vw, 32vw"
                 loading={i < 3 ? "eager" : "lazy"}
                 className={styles.image}
