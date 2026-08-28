@@ -6,9 +6,11 @@
  * non-public `API_BASE_URL` env variable: it never enters browser bundles.
  * No secret is involved — admin/session requests do not exist in V1 frontend.
  *
- * Note: no backend exists yet. Nothing in the app calls this client at build
- * or render time; feature modules will consume it when they are implemented.
+ * The `server-only` import is a hard boundary: any accidental import of this
+ * module from a Client Component fails the build immediately.
  */
+
+import "server-only";
 
 const API_BASE_URL = process.env.API_BASE_URL;
 
