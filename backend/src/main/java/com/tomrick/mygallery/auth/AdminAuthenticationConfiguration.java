@@ -1,11 +1,16 @@
 package com.tomrick.mygallery.auth;
 
+import com.tomrick.mygallery.auth.security.AdminCorsPolicy;
+import com.tomrick.mygallery.auth.security.AdminOriginValidationFilter;
+import com.tomrick.mygallery.auth.security.AdminSessionLifetimeFilter;
 import com.tomrick.mygallery.auth.security.JsonAccessDeniedHandler;
 import com.tomrick.mygallery.auth.security.JsonAuthenticationEntryPoint;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.env.Environment;
+import org.springframework.core.env.Profiles;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseCookie;
@@ -30,18 +35,18 @@ import org.springframework.security.web.authentication.session.CompositeSessionA
 import org.springframework.security.web.authentication.session.SessionAuthenticationStrategy;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 import org.springframework.security.web.csrf.CsrfAuthenticationStrategy;
 import org.springframework.security.web.csrf.CsrfLogoutHandler;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.security.web.csrf.HttpSessionCsrfTokenRepository;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.web.filter.CorsFilter;
 
-import java.net.URI;
 import java.time.Duration;
-import java.util.Arrays;
-import java.util.LinkedHashSet;
 import java.util.List;
 
 import static org.springframework.security.web.servlet.util.matcher.PathPatternRequestMatcher.pathPattern;
@@ -131,14 +136,14 @@ public class AdminAuthenticationConfiguration {
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
-            @Value("${mygallery.auth.cors.allowed-origins:}") String configuredOrigins
+            AdminCorsPolicy corsPolicy
     ) {
         var configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(parseExactOrigins(configuredOrigins));
+        configuration.setAllowedOrigins(corsPolicy.allowedOrigins());
         configuration.setAllowCredentials(true);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(List.of("Content-Type", "X-CSRF-TOKEN"));
-        configuration.setExposedHeaders(List.of("Retry-After"));
+        configuration.setExposedHeaders(List.of("Retry-After", "X-Request-ID"));
         configuration.setMaxAge(Duration.ofHours(1));
 
         var source = new UrlBasedCorsConfigurationSource();
@@ -154,7 +159,10 @@ public class AdminAuthenticationConfiguration {
             SessionAuthenticationStrategy adminSessionAuthenticationStrategy,
             CorsConfigurationSource corsConfigurationSource,
             JsonAuthenticationEntryPoint authenticationEntryPoint,
-            JsonAccessDeniedHandler accessDeniedHandler
+            JsonAccessDeniedHandler accessDeniedHandler,
+            AdminOriginValidationFilter originValidationFilter,
+            AdminSessionLifetimeFilter sessionLifetimeFilter,
+            Environment environment
     ) throws Exception {
         http
                 .authorizeHttpRequests(authorize -> authorize
@@ -186,6 +194,27 @@ public class AdminAuthenticationConfiguration {
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(authenticationEntryPoint)
                         .accessDeniedHandler(accessDeniedHandler))
+                .headers(headers -> {
+                    headers
+                            .contentTypeOptions(contentTypeOptions -> {
+                            })
+                            .referrerPolicy(referrer -> referrer.policy(
+                                    ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER
+                            ))
+                            .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                    "default-src 'none'; frame-ancestors 'none'"
+                            ));
+                    if (environment.acceptsProfiles(Profiles.of("prod"))) {
+                        headers.httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(false)
+                                .preload(false)
+                                .maxAgeInSeconds(31_536_000));
+                    } else {
+                        headers.httpStrictTransportSecurity(hsts -> hsts.disable());
+                    }
+                })
+                .addFilterAfter(sessionLifetimeFilter, SecurityContextHolderFilter.class)
+                .addFilterBefore(originValidationFilter, CorsFilter.class)
                 .requestCache(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
@@ -193,38 +222,5 @@ public class AdminAuthenticationConfiguration {
                 .logout(AbstractHttpConfigurer::disable);
 
         return http.build();
-    }
-
-    private static List<String> parseExactOrigins(String configuredOrigins) {
-        var origins = Arrays.stream(configuredOrigins.split(","))
-                .map(String::trim)
-                .filter(origin -> !origin.isEmpty())
-                .peek(AdminAuthenticationConfiguration::validateExactOrigin)
-                .collect(java.util.stream.Collectors.toCollection(LinkedHashSet::new));
-        return List.copyOf(origins);
-    }
-
-    private static void validateExactOrigin(String origin) {
-        if (origin.contains("*")) {
-            throw new IllegalArgumentException("CORS_ALLOWED_ORIGINS must contain exact origins only");
-        }
-
-        URI uri;
-        try {
-            uri = URI.create(origin);
-        } catch (IllegalArgumentException exception) {
-            throw new IllegalArgumentException("CORS_ALLOWED_ORIGINS contains an invalid origin", exception);
-        }
-
-        boolean validScheme = "http".equalsIgnoreCase(uri.getScheme())
-                || "https".equalsIgnoreCase(uri.getScheme());
-        boolean hasOnlyOriginComponents = uri.getHost() != null
-                && uri.getUserInfo() == null
-                && (uri.getPath() == null || uri.getPath().isEmpty())
-                && uri.getQuery() == null
-                && uri.getFragment() == null;
-        if (!validScheme || !hasOnlyOriginComponents) {
-            throw new IllegalArgumentException("CORS_ALLOWED_ORIGINS must contain exact HTTP(S) origins");
-        }
     }
 }

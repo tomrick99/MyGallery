@@ -553,3 +553,53 @@ Manual launch tests should also attempt direct original access and modified 6000
 - [Cloudinary: Upload API reference](https://cloudinary.com/documentation/image_upload_api_reference)
 
 These references guide implementation details; the repository's tests and the production checklist remain the acceptance criteria.
+
+---
+
+## 19. Step 5.15 Production Hardening Boundary
+
+### 19.1 Enforced in code
+
+The `prod` profile is intended to run together with `postgres,cloudinary`. It now
+fails startup when the session cookie is not the Secure, host-only
+`__Host-mygallery-session`, when the CORS allowlist is empty or contains a
+non-HTTPS/localhost/wildcard/non-origin value, or when the absolute admin session
+lifetime is not positive.
+
+Production admin mutations retain CSRF protection and additionally require an
+exact allowed `Origin`, or an allowed origin extracted from `Referer` when
+`Origin` is absent. Authenticated admin sessions keep the 30-minute idle timeout
+and also expire after the configured absolute lifetime (eight hours by default).
+The authentication timestamp remains in the server-side session.
+
+The backend generates an `X-Request-ID` for every `/api/v1/**` request, places it
+in the logging context, and returns a correlated sanitized `INTERNAL_ERROR` for
+otherwise unhandled API exceptions. API security headers include `nosniff`,
+`Referrer-Policy: no-referrer`, and a JSON-only restrictive CSP. HSTS is
+configured only for secure requests under the `prod` profile, without preload or
+`includeSubDomains`.
+
+Production uses framework-supported forwarded-header handling and assumes the
+application is reachable through the platform's trusted proxy path. The
+`postgres` profile configures a small environment-tunable Hikari pool, while the
+production server profile bounds request headers and connection timeout. Public
+Actuator exposure remains limited to sanitized health.
+
+### 19.2 Must still be configured or verified during deployment
+
+- Configure exact owned HTTPS frontend origins in Railway; no real domain is
+  committed in the repository.
+- Keep the backend container behind Railway's trusted proxy boundary and verify
+  forwarded scheme/host behavior on the deployed service.
+- Verify HTTPS redirect and the actual HSTS response on the final custom API
+  domain before considering transport hardening complete.
+- Configure and manually verify the Cloudinary restricted signed upload preset,
+  private originals, size/format limits, Strict Transformations, fixed gallery
+  variants, metadata stripping, and rejection of arbitrary high-resolution
+  transforms.
+- Verify Neon TLS, least privilege, backups/PITR, and restore operations.
+- A reliable JSON-body byte cap is deferred; image bytes never enter Spring and
+  the existing DTO/Bean Validation bounds remain active. Request buffering was
+  not added merely to impose this limit.
+- One concurrent owner session remains optional and is deliberately deferred;
+  no Redis, session database, or distributed session infrastructure is added.

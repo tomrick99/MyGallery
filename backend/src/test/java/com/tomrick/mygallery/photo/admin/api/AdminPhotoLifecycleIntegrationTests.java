@@ -1,6 +1,7 @@
 package com.tomrick.mygallery.photo.admin.api;
 
 import com.jayway.jsonpath.JsonPath;
+import com.tomrick.mygallery.auth.security.AdminSessionLifetimeFilter;
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoRepository;
 import com.tomrick.mygallery.photo.admin.domain.PhotoAssetGateway;
 import com.tomrick.mygallery.photo.admin.domain.VerifiedPhotoAsset;
@@ -20,6 +21,7 @@ import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -340,6 +342,10 @@ class AdminPhotoLifecycleIntegrationTests {
         session.setAttribute(
                 HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
                 context
+        );
+        session.setAttribute(
+                AdminSessionLifetimeFilter.AUTHENTICATED_AT_ATTRIBUTE,
+                Instant.now()
         );
         return session;
     }

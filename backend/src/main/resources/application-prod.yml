@@ -1,0 +1,14 @@
+server:
+  forward-headers-strategy: framework
+  max-http-request-header-size: ${MYGALLERY_MAX_HTTP_REQUEST_HEADER_SIZE:16KB}
+  tomcat:
+    connection-timeout: ${MYGALLERY_SERVER_CONNECTION_TIMEOUT:10s}
+  servlet:
+    session:
+      cookie:
+        name: ${SESSION_COOKIE_NAME:__Host-mygallery-session}
+        secure: ${SESSION_COOKIE_SECURE:true}
+
+mygallery:
+  security:
+    origin-enforcement-enabled: true

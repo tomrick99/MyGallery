@@ -1,6 +1,7 @@
 package com.tomrick.mygallery.auth;
 
 import com.tomrick.mygallery.auth.rate.AdminLoginRateLimiter;
+import com.tomrick.mygallery.auth.security.AdminSessionLifetimeFilter;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.slf4j.Logger;
@@ -15,6 +16,8 @@ import org.springframework.security.web.authentication.session.SessionAuthentica
 import org.springframework.security.web.context.SecurityContextRepository;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
+
 @Service
 public class AdminAuthenticationService {
 
@@ -25,19 +28,22 @@ public class AdminAuthenticationService {
     private final SecurityContextRepository securityContextRepository;
     private final AdminLoginRateLimiter rateLimiter;
     private final LogoutHandler logoutHandler;
+    private final Clock clock;
 
     public AdminAuthenticationService(
             AuthenticationManager authenticationManager,
             SessionAuthenticationStrategy sessionAuthenticationStrategy,
             SecurityContextRepository securityContextRepository,
             AdminLoginRateLimiter rateLimiter,
-            LogoutHandler logoutHandler
+            LogoutHandler logoutHandler,
+            Clock clock
     ) {
         this.authenticationManager = authenticationManager;
         this.sessionAuthenticationStrategy = sessionAuthenticationStrategy;
         this.securityContextRepository = securityContextRepository;
         this.rateLimiter = rateLimiter;
         this.logoutHandler = logoutHandler;
+        this.clock = clock;
     }
 
     public LoginResult login(
@@ -69,6 +75,10 @@ public class AdminAuthenticationService {
         }
 
         sessionAuthenticationStrategy.onAuthentication(authentication, request, response);
+        request.getSession(true).setAttribute(
+                AdminSessionLifetimeFilter.AUTHENTICATED_AT_ATTRIBUTE,
+                clock.instant()
+        );
         var securityContext = SecurityContextHolder.createEmptyContext();
         securityContext.setAuthentication(authentication);
         SecurityContextHolder.setContext(securityContext);

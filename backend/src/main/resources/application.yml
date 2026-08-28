@@ -11,6 +11,8 @@ mygallery:
       password-bcrypt-hash: ${ADMIN_PASSWORD_BCRYPT_HASH:}
     cors:
       allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+    session:
+      absolute-timeout: ${ADMIN_SESSION_ABSOLUTE_TIMEOUT:8h}
   cloudinary:
     upload:
       cloud-name: ${CLOUDINARY_CLOUD_NAME:}

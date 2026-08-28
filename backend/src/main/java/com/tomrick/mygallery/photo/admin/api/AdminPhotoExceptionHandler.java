@@ -10,6 +10,8 @@ import com.tomrick.mygallery.photo.admin.application.InvalidUploadedAssetExcepti
 import com.tomrick.mygallery.photo.admin.application.MediaProviderUnavailableException;
 import com.tomrick.mygallery.photo.admin.application.UploadRateLimitExceededException;
 import com.tomrick.mygallery.photo.admin.domain.DuplicatePhotoAssetException;
+import org.springframework.core.Ordered;
+import org.springframework.core.annotation.Order;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -28,6 +30,7 @@ import java.util.List;
         AdminPhotoController.class,
         AdminUploadController.class
 })
+@Order(Ordered.HIGHEST_PRECEDENCE)
 public class AdminPhotoExceptionHandler {
 
     @ExceptionHandler(AdminPhotoNotFoundException.class)
