@@ -21,11 +21,11 @@ export default function Hero({
     <section className={styles.hero} aria-label="Featured photography">
       <div className={styles.text}>
         <h1 className={styles.title}>
-          <span className={styles.line}>TOM</span>
-          <span className={`${styles.line} ${styles.lineIndent}`}>RICK</span>
+          <span className={styles.line}>FRAMES</span>
+          <span className={`${styles.line} ${styles.lineIndent}`}>BY TOM</span>
         </h1>
         <p className={styles.sub}>
-          <span>PHOTOGRAPHY</span>
+          <span>PERSONAL PHOTOGRAPHIC ARCHIVE</span>
           <span className={styles.years}>2024 — 2026</span>
         </p>
         <p className={styles.note}>
