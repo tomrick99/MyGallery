@@ -135,6 +135,46 @@ class PhotoEntity {
         this.updatedAt = updatedAt;
     }
 
+    static PhotoEntity create(
+            UUID id,
+            String title,
+            LocalDate takenAt,
+            String location,
+            String cloudinaryPublicId,
+            int width,
+            int height,
+            boolean featured,
+            PhotoVisibility visibility,
+            String camera,
+            String lens,
+            BigDecimal focalLength,
+            BigDecimal aperture,
+            BigDecimal shutterSpeed,
+            Integer iso,
+            String description
+    ) {
+        return new PhotoEntity(
+                id,
+                title,
+                takenAt,
+                location,
+                cloudinaryPublicId,
+                width,
+                height,
+                featured,
+                visibility,
+                camera,
+                lens,
+                focalLength,
+                aperture,
+                shutterSpeed,
+                iso,
+                description,
+                null,
+                null
+        );
+    }
+
     @PrePersist
     void prepareForInsert() {
         Instant now = Instant.now();

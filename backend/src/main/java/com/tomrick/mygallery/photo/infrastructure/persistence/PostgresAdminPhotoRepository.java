@@ -1,12 +1,16 @@
 package com.tomrick.mygallery.photo.infrastructure.persistence;
 
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoPage;
+import com.tomrick.mygallery.photo.admin.domain.AdminPhotoCreate;
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoRepository;
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoUpdate;
+import com.tomrick.mygallery.photo.admin.domain.DuplicatePhotoAssetException;
+import com.tomrick.mygallery.photo.admin.domain.PhotoAssetIdentity;
 import com.tomrick.mygallery.photo.domain.Photo;
 import com.tomrick.mygallery.photo.infrastructure.media.PhotoImageUrlResolver;
 import com.tomrick.mygallery.photo.infrastructure.media.PhotoImageUrlResolver.PhotoImageUrls;
 import org.springframework.context.annotation.Profile;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Repository;
@@ -51,6 +55,39 @@ public class PostgresAdminPhotoRepository implements AdminPhotoRepository {
     }
 
     @Override
+    public boolean existsByCloudinaryPublicId(String cloudinaryPublicId) {
+        return entityRepository.existsByCloudinaryPublicId(cloudinaryPublicId);
+    }
+
+    @Override
+    @Transactional
+    public Photo create(AdminPhotoCreate create) {
+        PhotoEntity entity = PhotoEntity.create(
+                create.id(),
+                create.title(),
+                create.takenAt(),
+                create.location(),
+                create.cloudinaryPublicId(),
+                create.width(),
+                create.height(),
+                create.featured(),
+                create.visibility(),
+                create.camera(),
+                create.lens(),
+                create.focalLengthMm(),
+                create.aperture(),
+                create.shutterSpeedSeconds(),
+                create.iso(),
+                create.description()
+        );
+        try {
+            return toDomain(entityRepository.saveAndFlush(entity));
+        } catch (DataIntegrityViolationException exception) {
+            throw new DuplicatePhotoAssetException();
+        }
+    }
+
+    @Override
     @Transactional
     public Optional<Photo> update(UUID id, AdminPhotoUpdate update) {
         return entityRepository.findById(id).map(entity -> {
@@ -70,6 +107,27 @@ public class PostgresAdminPhotoRepository implements AdminPhotoRepository {
             );
             return toDomain(entity);
         });
+    }
+
+    @Override
+    public Optional<PhotoAssetIdentity> findAssetIdentityByPhotoId(UUID id) {
+        return entityRepository.findById(id)
+                .map(entity -> new PhotoAssetIdentity(
+                        entity.getId(),
+                        entity.getCloudinaryPublicId()
+                ));
+    }
+
+    @Override
+    @Transactional
+    public boolean deleteById(UUID id) {
+        Optional<PhotoEntity> entity = entityRepository.findById(id);
+        if (entity.isEmpty()) {
+            return false;
+        }
+        entityRepository.delete(entity.orElseThrow());
+        entityRepository.flush();
+        return true;
     }
 
     private Photo toDomain(PhotoEntity entity) {

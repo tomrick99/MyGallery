@@ -1,7 +1,10 @@
 package com.tomrick.mygallery.photo.infrastructure.persistence;
 
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoPage;
+import com.tomrick.mygallery.photo.admin.domain.AdminPhotoCreate;
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoUpdate;
+import com.tomrick.mygallery.photo.admin.domain.DuplicatePhotoAssetException;
+import com.tomrick.mygallery.photo.admin.domain.PhotoAssetIdentity;
 import com.tomrick.mygallery.photo.domain.Photo;
 import com.tomrick.mygallery.photo.domain.PhotoVisibility;
 import com.tomrick.mygallery.photo.infrastructure.media.PhotoImageUrlResolver;
@@ -11,6 +14,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.lang.reflect.Proxy;
 import java.math.BigDecimal;
@@ -22,6 +26,8 @@ import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class PostgresAdminPhotoRepositoryTests {
@@ -36,12 +42,24 @@ class PostgresAdminPhotoRepositoryTests {
     private Optional<PhotoEntity> findByIdResult;
     private Pageable queriedPageable;
     private UUID queriedPhotoId;
+    private String queriedPublicId;
+    private boolean existsByPublicId;
+    private PhotoEntity savedEntity;
+    private PhotoEntity deletedEntity;
+    private boolean flushed;
+    private RuntimeException saveFailure;
 
     @BeforeEach
     void setUp() {
         findAllResult = List.of();
         totalElements = 0;
         findByIdResult = Optional.empty();
+        queriedPublicId = null;
+        existsByPublicId = false;
+        savedEntity = null;
+        deletedEntity = null;
+        flushed = false;
+        saveFailure = null;
 
         JpaPhotoEntityRepository entityRepository = repositoryProxy();
         PhotoImageUrlResolver imageUrlResolver = ignored -> resolvedUrls();
@@ -139,6 +157,89 @@ class PostgresAdminPhotoRepositoryTests {
         assertEquals(PHOTO_ID, queriedPhotoId);
     }
 
+    @Test
+    void createPersistsVerifiedAssetIdentityAndDimensions() {
+        UUID createdId = UUID.fromString("30000000-0000-4000-8000-000000000002");
+        AdminPhotoCreate create = new AdminPhotoCreate(
+                createdId,
+                "mygallery/originals/verified-asset",
+                7200,
+                4800,
+                "Verified Persistence Upload",
+                LocalDate.of(2026, 8, 20),
+                "Tianjin",
+                false,
+                PhotoVisibility.PRIVATE,
+                "Camera",
+                "Lens",
+                new BigDecimal("50.00"),
+                new BigDecimal("4.00"),
+                new BigDecimal("0.008000000"),
+                800,
+                "Verified before persistence."
+        );
+
+        Photo result = adminPhotoRepository.create(create);
+
+        assertEquals(createdId, result.id());
+        assertEquals(7200, result.width());
+        assertEquals(4800, result.height());
+        assertEquals(create.cloudinaryPublicId(), savedEntity.getCloudinaryPublicId());
+        assertEquals(PhotoVisibility.PRIVATE, savedEntity.getVisibility());
+    }
+
+    @Test
+    void duplicateDatabaseConstraintIsMappedToStableDomainConflict() {
+        saveFailure = new DataIntegrityViolationException("unique constraint");
+
+        assertThrows(
+                DuplicatePhotoAssetException.class,
+                () -> adminPhotoRepository.create(new AdminPhotoCreate(
+                        UUID.randomUUID(),
+                        CLOUDINARY_PUBLIC_ID,
+                        6000,
+                        4000,
+                        "Duplicate",
+                        LocalDate.of(2026, 8, 20),
+                        null,
+                        false,
+                        PhotoVisibility.PRIVATE,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                ))
+        );
+    }
+
+    @Test
+    void assetLookupAndDeleteUseTheStoredInternalIdentity() {
+        PhotoEntity entity = privatePhotoEntity();
+        findByIdResult = Optional.of(entity);
+
+        PhotoAssetIdentity identity = adminPhotoRepository
+                .findAssetIdentityByPhotoId(PHOTO_ID)
+                .orElseThrow();
+        boolean deleted = adminPhotoRepository.deleteById(PHOTO_ID);
+
+        assertEquals(PHOTO_ID, identity.photoId());
+        assertEquals(CLOUDINARY_PUBLIC_ID, identity.cloudinaryPublicId());
+        assertTrue(deleted);
+        assertSame(entity, deletedEntity);
+        assertTrue(flushed);
+    }
+
+    @Test
+    void duplicatePreflightDelegatesToTheDatabaseIdentityCheck() {
+        existsByPublicId = true;
+
+        assertTrue(adminPhotoRepository.existsByCloudinaryPublicId(CLOUDINARY_PUBLIC_ID));
+        assertEquals(CLOUDINARY_PUBLIC_ID, queriedPublicId);
+    }
+
     private JpaPhotoEntityRepository repositoryProxy() {
         return (JpaPhotoEntityRepository) Proxy.newProxyInstance(
                 JpaPhotoEntityRepository.class.getClassLoader(),
@@ -151,6 +252,25 @@ class PostgresAdminPhotoRepositoryTests {
                     case "findById" -> {
                         queriedPhotoId = (UUID) arguments[0];
                         yield findByIdResult;
+                    }
+                    case "existsByCloudinaryPublicId" -> {
+                        queriedPublicId = (String) arguments[0];
+                        yield existsByPublicId;
+                    }
+                    case "saveAndFlush" -> {
+                        if (saveFailure != null) {
+                            throw saveFailure;
+                        }
+                        savedEntity = (PhotoEntity) arguments[0];
+                        yield savedEntity;
+                    }
+                    case "delete" -> {
+                        deletedEntity = (PhotoEntity) arguments[0];
+                        yield null;
+                    }
+                    case "flush" -> {
+                        flushed = true;
+                        yield null;
                     }
                     default -> throw new UnsupportedOperationException(method.getName());
                 }

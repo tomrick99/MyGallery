@@ -76,7 +76,7 @@ public class AdminPhotoService {
         }
     }
 
-    private static AdminPhotoResponse toResponse(Photo photo) {
+    static AdminPhotoResponse toResponse(Photo photo) {
         return new AdminPhotoResponse(
                 photo.id(),
                 photo.title(),

@@ -1,3 +1,10 @@
 spring:
   autoconfigure:
     exclude: org.springframework.boot.jdbc.autoconfigure.DataSourceAutoConfiguration
+
+mygallery:
+  cloudinary:
+    upload:
+      cloud-name: development-cloud
+      api-key: development-api-key
+      upload-preset: development-signed-preset

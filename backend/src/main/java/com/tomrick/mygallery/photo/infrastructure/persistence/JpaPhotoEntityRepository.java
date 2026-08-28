@@ -12,4 +12,6 @@ interface JpaPhotoEntityRepository extends JpaRepository<PhotoEntity, UUID> {
     List<PhotoEntity> findAllByVisibilityOrderByTakenAtDescIdDesc(PhotoVisibility visibility);
 
     Optional<PhotoEntity> findByIdAndVisibility(UUID id, PhotoVisibility visibility);
+
+    boolean existsByCloudinaryPublicId(String cloudinaryPublicId);
 }

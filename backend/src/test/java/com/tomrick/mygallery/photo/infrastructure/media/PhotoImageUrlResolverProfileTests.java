@@ -1,5 +1,6 @@
 package com.tomrick.mygallery.photo.infrastructure.media;
 
+import com.tomrick.mygallery.photo.admin.application.AdminUploadConfiguration;
 import com.tomrick.mygallery.photo.infrastructure.media.cloudinary.CloudinaryConfiguration;
 import com.tomrick.mygallery.photo.infrastructure.media.cloudinary.CloudinaryPhotoImageUrlResolver;
 import org.junit.jupiter.api.Test;
@@ -11,6 +12,7 @@ class PhotoImageUrlResolverProfileTests {
 
     private final ApplicationContextRunner contextRunner = new ApplicationContextRunner()
             .withUserConfiguration(
+                    AdminUploadConfiguration.class,
                     DevelopmentPhotoImageUrlResolver.class,
                     CloudinaryConfiguration.class,
                     CloudinaryPhotoImageUrlResolver.class
@@ -34,7 +36,10 @@ class PhotoImageUrlResolverProfileTests {
                         "spring.profiles.active=postgres,cloudinary",
                         "mygallery.cloudinary.cloud-name=test-cloud",
                         "mygallery.cloudinary.api-key=test-api-key",
-                        "mygallery.cloudinary.api-secret=test-api-secret"
+                        "mygallery.cloudinary.api-secret=test-api-secret",
+                        "mygallery.cloudinary.upload.cloud-name=test-cloud",
+                        "mygallery.cloudinary.upload.api-key=test-api-key",
+                        "mygallery.cloudinary.upload.upload-preset=test-signed-preset"
                 )
                 .run(context -> {
                     assertThat(context).hasSingleBean(PhotoImageUrlResolver.class);
@@ -51,6 +56,24 @@ class PhotoImageUrlResolverProfileTests {
                     assertThat(context).hasFailed();
                     assertThat(context.getStartupFailure())
                             .hasRootCauseMessage("CLOUDINARY_CLOUD_NAME must not be blank");
+                });
+    }
+
+    @Test
+    void cloudinaryProfileFailsFastWhenUploadPresetIsMissing() {
+        contextRunner
+                .withPropertyValues(
+                        "spring.profiles.active=postgres,cloudinary",
+                        "mygallery.cloudinary.cloud-name=test-cloud",
+                        "mygallery.cloudinary.api-key=test-api-key",
+                        "mygallery.cloudinary.api-secret=test-api-secret",
+                        "mygallery.cloudinary.upload.cloud-name=test-cloud",
+                        "mygallery.cloudinary.upload.api-key=test-api-key"
+                )
+                .run(context -> {
+                    assertThat(context).hasFailed();
+                    assertThat(context.getStartupFailure())
+                            .hasRootCauseMessage("CLOUDINARY_UPLOAD_PRESET must not be blank");
                 });
     }
 }

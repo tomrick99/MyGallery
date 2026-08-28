@@ -11,5 +11,13 @@ public interface AdminPhotoRepository {
 
     Optional<Photo> findById(UUID id);
 
+    boolean existsByCloudinaryPublicId(String cloudinaryPublicId);
+
+    Photo create(AdminPhotoCreate create);
+
     Optional<Photo> update(UUID id, AdminPhotoUpdate update);
+
+    Optional<PhotoAssetIdentity> findAssetIdentityByPhotoId(UUID id);
+
+    boolean deleteById(UUID id);
 }

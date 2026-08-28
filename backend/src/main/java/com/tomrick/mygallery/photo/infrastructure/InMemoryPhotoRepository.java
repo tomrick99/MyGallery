@@ -1,8 +1,11 @@
 package com.tomrick.mygallery.photo.infrastructure;
 
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoPage;
+import com.tomrick.mygallery.photo.admin.domain.AdminPhotoCreate;
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoRepository;
 import com.tomrick.mygallery.photo.admin.domain.AdminPhotoUpdate;
+import com.tomrick.mygallery.photo.admin.domain.DuplicatePhotoAssetException;
+import com.tomrick.mygallery.photo.admin.domain.PhotoAssetIdentity;
 import com.tomrick.mygallery.photo.domain.Photo;
 import com.tomrick.mygallery.photo.domain.PhotoRepository;
 import com.tomrick.mygallery.photo.domain.PhotoVisibility;
@@ -10,10 +13,16 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -146,6 +155,18 @@ public class InMemoryPhotoRepository implements PhotoRepository, AdminPhotoRepos
                     PhotoVisibility.PRIVATE
             )
     ));
+    private final Map<UUID, String> assetIdentities = new HashMap<>(Map.ofEntries(
+            assetIdentity("10000000-0000-0000-0000-000000000101", "orange-steel-over-water"),
+            assetIdentity("10000000-0000-0000-0000-000000000102", "blue-hour-crossing"),
+            assetIdentity("10000000-0000-0000-0000-000000000103", "quiet-courtyard"),
+            assetIdentity("10000000-0000-0000-0000-000000000104", "tetrapod-smile"),
+            assetIdentity("10000000-0000-0000-0000-000000000105", "rust-geometry"),
+            assetIdentity("10000000-0000-0000-0000-000000000106", "neon-suspension"),
+            assetIdentity("10000000-0000-0000-0000-000000000107", "concrete-shore-study"),
+            assetIdentity("10000000-0000-0000-0000-000000000108", "city-veins-at-night"),
+            assetIdentity("10000000-0000-0000-0000-000000000901", "private-featured-study"),
+            assetIdentity("10000000-0000-0000-0000-000000000902", "private-portrait-study")
+    ));
 
     @Override
     public synchronized List<Photo> findAllPublic() {
@@ -185,6 +206,44 @@ public class InMemoryPhotoRepository implements PhotoRepository, AdminPhotoRepos
     }
 
     @Override
+    public synchronized boolean existsByCloudinaryPublicId(String cloudinaryPublicId) {
+        return assetIdentities.containsValue(cloudinaryPublicId);
+    }
+
+    @Override
+    public synchronized Photo create(AdminPhotoCreate create) {
+        if (assetIdentities.containsValue(create.cloudinaryPublicId())) {
+            throw new DuplicatePhotoAssetException();
+        }
+
+        String derivativeBaseUrl = DERIVATIVE_BASE_URL
+                + opaqueAssetKey(create.cloudinaryPublicId()) + "/";
+        Photo photo = new Photo(
+                create.id(),
+                create.title(),
+                create.takenAt(),
+                create.location(),
+                create.width(),
+                create.height(),
+                create.featured(),
+                create.visibility(),
+                derivativeBaseUrl + "thumbnail.jpg",
+                derivativeBaseUrl + "card.jpg",
+                derivativeBaseUrl + "display.jpg",
+                create.camera(),
+                create.lens(),
+                create.focalLengthMm(),
+                create.aperture(),
+                create.shutterSpeedSeconds(),
+                create.iso(),
+                create.description()
+        );
+        photos.add(photo);
+        assetIdentities.put(photo.id(), create.cloudinaryPublicId());
+        return photo;
+    }
+
+    @Override
     public synchronized Optional<Photo> update(UUID id, AdminPhotoUpdate update) {
         for (int index = 0; index < photos.size(); index++) {
             Photo existing = photos.get(index);
@@ -195,6 +254,23 @@ public class InMemoryPhotoRepository implements PhotoRepository, AdminPhotoRepos
             }
         }
         return Optional.empty();
+    }
+
+    @Override
+    public synchronized Optional<PhotoAssetIdentity> findAssetIdentityByPhotoId(UUID id) {
+        String publicId = assetIdentities.get(id);
+        return publicId == null
+                ? Optional.empty()
+                : Optional.of(new PhotoAssetIdentity(id, publicId));
+    }
+
+    @Override
+    public synchronized boolean deleteById(UUID id) {
+        boolean removed = photos.removeIf(photo -> photo.id().equals(id));
+        if (removed) {
+            assetIdentities.remove(id);
+        }
+        return removed;
     }
 
     private static boolean isPublic(Photo photo) {
@@ -222,6 +298,23 @@ public class InMemoryPhotoRepository implements PhotoRepository, AdminPhotoRepos
                 update.iso(),
                 update.description()
         );
+    }
+
+    private static Map.Entry<UUID, String> assetIdentity(String id, String assetName) {
+        return Map.entry(
+                UUID.fromString(id),
+                "mygallery/originals/" + assetName
+        );
+    }
+
+    private static String opaqueAssetKey(String cloudinaryPublicId) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(cloudinaryPublicId.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is unavailable", exception);
+        }
     }
 
     private static Photo photo(
