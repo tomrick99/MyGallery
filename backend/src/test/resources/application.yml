@@ -7,10 +7,10 @@ spring:
 mygallery:
   auth:
     admin:
-      username: ${ADMIN_USERNAME:}
-      password-bcrypt-hash: ${ADMIN_PASSWORD_BCRYPT_HASH:}
+      username: test-owner
+      password-bcrypt-hash: '$2a$04$vvfatPN0PdqIWH8vfIprVOriHke81ApVotyhpAzHvfLMU4LM1ntz2'
     cors:
-      allowed-origins: ${CORS_ALLOWED_ORIGINS:}
+      allowed-origins: http://localhost:3000
 
 server:
   servlet:
@@ -18,8 +18,8 @@ server:
       timeout: 30m
       tracking-modes: cookie
       cookie:
-        name: ${SESSION_COOKIE_NAME:mygallery-session}
-        secure: ${SESSION_COOKIE_SECURE:false}
+        name: mygallery-test-session
+        secure: false
         http-only: true
         same-site: lax
         path: /
