@@ -32,7 +32,7 @@ class AdminPhotoCreationServiceTests {
             "mygallery/originals",
             MAX_BYTES,
             120L,
-            List.of("jpg", "jpeg", "png", "webp", "heic")
+            null
     );
 
     @Test

@@ -19,7 +19,7 @@ mygallery:
       public-id-prefix: ${CLOUDINARY_UPLOAD_PUBLIC_ID_PREFIX:mygallery/originals}
       max-bytes: ${CLOUDINARY_UPLOAD_MAX_BYTES:52428800}
       signature-ttl-seconds: ${CLOUDINARY_UPLOAD_SIGNATURE_TTL_SECONDS:120}
-      allowed-formats: ${CLOUDINARY_UPLOAD_ALLOWED_FORMATS:jpg,jpeg,png,webp,heic}
+      allowed-formats: ${CLOUDINARY_UPLOAD_ALLOWED_FORMATS:jpg,jpeg,png,webp,heic,heif}
 
 server:
   servlet:

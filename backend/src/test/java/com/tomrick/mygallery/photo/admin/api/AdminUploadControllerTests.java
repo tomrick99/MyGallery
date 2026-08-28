@@ -121,6 +121,17 @@ class AdminUploadControllerTests {
     }
 
     @Test
+    void signatureAcceptsHeifUploadDeclarations() throws Exception {
+        CsrfSession admin = refreshCsrf(loginSuccessfully("192.0.2.66").session(), "192.0.2.66");
+
+        signature(
+                admin,
+                "192.0.2.66",
+                uploadDeclaration("photo.heif", "image/heif", 18_432_109)
+        ).andExpect(status().isOk());
+    }
+
+    @Test
     void signatureRateLimitIsBoundedAndReturnsRetryAfter() throws Exception {
         CsrfSession admin = refreshCsrf(loginSuccessfully("192.0.2.65").session(), "192.0.2.65");
 

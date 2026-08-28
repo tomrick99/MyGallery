@@ -21,7 +21,7 @@ public record AdminUploadProperties(
     private static final long DEFAULT_MAX_BYTES = 52_428_800L;
     private static final long DEFAULT_SIGNATURE_TTL_SECONDS = 120L;
     private static final Set<String> DEFAULT_ALLOWED_FORMATS =
-            Set.of("jpg", "jpeg", "png", "webp", "heic");
+            Set.of("jpg", "jpeg", "png", "webp", "heic", "heif");
 
     public AdminUploadProperties {
         cloudName = trimToEmpty(cloudName);

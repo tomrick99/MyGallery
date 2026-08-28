@@ -53,11 +53,12 @@ class AdminPhotoLifecycleIntegrationTests {
     private AdminPhotoRepository adminPhotoRepository;
 
     @Test
-    void verifiedCreateUsesProviderMetadataAndRespectsVisibilityBoundaries() throws Exception {
+    void verifiedCreateAcceptsHeifProviderMetadataAndRespectsVisibilityBoundaries()
+            throws Exception {
         CsrfSession admin = adminCsrf();
         InMemoryPhotoAssetGateway assets = assets();
         String privateAsset = publicId("10000000-1000-4000-8000-000000000001");
-        assets.register(validAsset(privateAsset, 7200, 4800));
+        assets.register(validAsset(privateAsset, 7200, 4800, "heif"));
 
         MvcResult privateCreate = mockMvc.perform(post("/api/v1/admin/photos")
                         .session(admin.session())
@@ -266,11 +267,20 @@ class AdminPhotoLifecycleIntegrationTests {
     }
 
     private static VerifiedPhotoAsset validAsset(String publicId, int width, int height) {
+        return validAsset(publicId, width, height, "jpg");
+    }
+
+    private static VerifiedPhotoAsset validAsset(
+            String publicId,
+            int width,
+            int height,
+            String format
+    ) {
         return new VerifiedPhotoAsset(
                 publicId,
                 "image",
                 "private",
-                "jpg",
+                format,
                 width,
                 height,
                 18_432_109L
