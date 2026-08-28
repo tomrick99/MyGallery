@@ -1,6 +1,7 @@
 import Image from "next/image";
 import type { PhotoSummary } from "@/types/photo";
 import type { ArchiveVariant } from "@/lib/photos/layoutVariant";
+import { photoAltText, photoCaptionText } from "@/lib/photos/display";
 import PhotoLightboxTrigger from "@/components/Lightbox/PhotoLightboxTrigger";
 import styles from "./Archive.module.css";
 
@@ -23,9 +24,7 @@ export default function PhotoCard({
   photo: PhotoSummary;
   variant: ArchiveVariant;
 }) {
-  const alt = photo.location
-    ? `${photo.title} — ${photo.location}`
-    : photo.title;
+  const alt = photoAltText(photo);
 
   return (
     <figure className={`${styles.card} ${styles[variant]}`}>
@@ -52,8 +51,8 @@ export default function PhotoCard({
         />
       </div>
       <figcaption className={styles.caption}>
-        <span>{photo.title}</span>
-        {photo.location ? <span>{photo.location}</span> : null}
+        <span>{photoCaptionText(photo)}</span>
+        {photo.location && photo.title ? <span>{photo.location}</span> : null}
       </figcaption>
     </figure>
   );

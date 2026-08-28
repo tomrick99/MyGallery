@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useState, type FormEvent } from "react";
 import type { AdminPhoto } from "@/types/admin";
 import { AdminApiError, updatePhoto } from "@/lib/api/admin-client";
+import { photoAltText, photoCaptionText } from "@/lib/photos/display";
 import { describeAdminError } from "./errors";
 import {
   buildMetadataPayload,
@@ -67,12 +68,12 @@ export default function AdminPhotoEditor({
   };
 
   return (
-    <AdminModal label={`Edit ${photo.title}`} busy={busy} onClose={onClose} wide>
+    <AdminModal label={`Edit ${photoCaptionText(photo)}`} busy={busy} onClose={onClose} wide>
       <form className={styles.editor} onSubmit={submit}>
         <div className={styles.editorPreview}>
           <Image
             src={photo.image.displayUrl}
-            alt={photo.title}
+            alt={photoAltText(photo)}
             width={1024}
             height={Math.round(1024 / photo.aspectRatio)}
             unoptimized
@@ -84,8 +85,8 @@ export default function AdminPhotoEditor({
         </div>
 
         <div className={styles.editorFields}>
-          <Field label="Title" error={errors.title}>
-            <TextInput value={values.title} onChange={set("title")} required maxLength={200} />
+          <Field label="Title (optional)" error={errors.title}>
+            <TextInput value={values.title} onChange={set("title")} maxLength={200} />
           </Field>
           <Field label="Taken At" error={errors.takenAt}>
             <TextInput type="date" value={values.takenAt} onChange={set("takenAt")} required />

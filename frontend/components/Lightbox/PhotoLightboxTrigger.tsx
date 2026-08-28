@@ -1,6 +1,7 @@
 "use client";
 
 import { useLightbox } from "./LightboxProvider";
+import { photoCaptionText } from "@/lib/photos/display";
 import type { LightboxPhoto } from "./types";
 import styles from "./Lightbox.module.css";
 
@@ -23,7 +24,7 @@ export default function PhotoLightboxTrigger({
       type="button"
       className={styles.trigger}
       onClick={() => open(photo)}
-      aria-label={`View photograph: ${photo.title}`}
+      aria-label={`View photograph: ${photoCaptionText(photo)}`}
     />
   );
 }

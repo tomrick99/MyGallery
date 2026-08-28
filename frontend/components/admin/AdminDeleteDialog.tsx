@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AdminPhoto } from "@/types/admin";
 import { deletePhoto } from "@/lib/api/admin-client";
+import { photoCaptionText } from "@/lib/photos/display";
 import { describeAdminError } from "./errors";
 import AdminModal from "./AdminModal";
 import styles from "./admin.module.css";
@@ -39,9 +40,9 @@ export default function AdminDeleteDialog({
   };
 
   return (
-    <AdminModal label={`Delete ${photo.title}`} busy={busy} onClose={onCancel}>
+    <AdminModal label={`Delete ${photoCaptionText(photo)}`} busy={busy} onClose={onCancel}>
       <div className={styles.dialogBody}>
-        <p className={styles.dialogTitle}>Delete “{photo.title}”?</p>
+        <p className={styles.dialogTitle}>Delete “{photoCaptionText(photo)}”?</p>
         <p className={styles.dialogText}>
           This permanently removes the managed photo and its private
           Cloudinary asset.

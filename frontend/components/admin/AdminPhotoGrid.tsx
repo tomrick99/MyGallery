@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import type { AdminPhoto } from "@/types/admin";
+import { photoAltText, photoCaptionText } from "@/lib/photos/display";
 import styles from "./admin.module.css";
 
 /**
@@ -24,12 +25,12 @@ export default function AdminPhotoGrid({
           role="listitem"
           className={styles.card}
           onClick={() => onEdit(photo)}
-          aria-label={`Edit ${photo.title}`}
+          aria-label={`Edit ${photoCaptionText(photo)}`}
         >
           <span className={styles.cardFrame}>
             <Image
               src={photo.image.thumbnailUrl}
-              alt={photo.title}
+              alt={photoAltText(photo)}
               width={480}
               height={Math.round(480 / photo.aspectRatio)}
               unoptimized
@@ -37,7 +38,7 @@ export default function AdminPhotoGrid({
             />
           </span>
           <span className={styles.cardMeta}>
-            <span className={styles.cardTitle}>{photo.title}</span>
+            <span className={styles.cardTitle}>{photoCaptionText(photo)}</span>
             <span className={styles.cardDate}>{photo.takenAt}</span>
             <span className={styles.cardStatusRow}>
               <span

@@ -13,7 +13,8 @@ export interface PhotoImage {
 
 export interface PhotoSummary {
   id: string;
-  title: string;
+  /** Optional — blank titles are stored as null; fall back to location/year. */
+  title: string | null;
   takenAt: string;
   year: number;
   month: number;

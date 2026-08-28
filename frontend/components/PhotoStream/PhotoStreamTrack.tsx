@@ -1,5 +1,6 @@
 import Image from "next/image";
 import type { PhotoSummary } from "@/types/photo";
+import { photoAltText, photoCaptionText } from "@/lib/photos/display";
 import styles from "./PhotoStream.module.css";
 
 /**
@@ -32,12 +33,8 @@ export default function PhotoStreamTrack({
       {items.map((photo, i) => {
         const duplicate = i >= photos.length;
         const variant = variantFor(photo, i % photos.length);
-        const alt = photo.location
-          ? `${photo.title} — ${photo.location}`
-          : photo.title;
-        const caption = photo.location
-          ? `${photo.title} — ${photo.location}`
-          : photo.title;
+        const alt = photoAltText(photo);
+        const caption = photoCaptionText(photo);
 
         return (
           <figure

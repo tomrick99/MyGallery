@@ -239,8 +239,8 @@ export default function AdminUploadPanel({
         </div>
 
         <div className={styles.editorFields}>
-          <Field label="Title" error={errors.title}>
-            <TextInput value={values.title} onChange={set("title")} required maxLength={200} />
+          <Field label="Title (optional)" error={errors.title}>
+            <TextInput value={values.title} onChange={set("title")} maxLength={200} />
           </Field>
           <Field label="Taken At" error={errors.takenAt}>
             <TextInput type="date" value={values.takenAt} onChange={set("takenAt")} required />

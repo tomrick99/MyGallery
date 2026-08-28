@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import { useEffect, useRef } from "react";
+import { photoAltText, photoCaptionText } from "@/lib/photos/display";
 import type { LightboxPhoto } from "./types";
 import styles from "./Lightbox.module.css";
 
@@ -69,9 +70,8 @@ export default function Lightbox({
     };
   }, [onClose]);
 
-  const alt = photo.location
-    ? `${photo.title} — ${photo.location}`
-    : photo.title;
+  const alt = photoAltText(photo);
+  const dialogLabel = photoCaptionText(photo);
 
   return (
     <div className={styles.backdrop} onClick={onClose}>
@@ -79,7 +79,7 @@ export default function Lightbox({
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-label={photo.title}
+        aria-label={dialogLabel}
         tabIndex={-1}
         className={styles.dialog}
         onClick={(event) => event.stopPropagation()}
@@ -103,8 +103,7 @@ export default function Lightbox({
             unoptimized
           />
           <figcaption className={styles.caption}>
-            <span>{photo.title}</span>
-            {photo.location ? <span>{photo.location}</span> : null}
+            <span>{dialogLabel}</span>
             <span>{photo.takenAt}</span>
           </figcaption>
         </figure>

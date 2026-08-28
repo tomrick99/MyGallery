@@ -4,7 +4,7 @@
  */
 export interface LightboxPhoto {
   id: string;
-  title: string;
+  title: string | null;
   location: string | null;
   takenAt: string;
   aspectRatio: number;

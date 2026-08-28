@@ -11,7 +11,8 @@ export type Visibility = "PUBLIC" | "PRIVATE";
 
 export interface AdminPhoto {
   id: string;
-  title: string;
+  /** Optional — blank titles are stored as null. */
+  title: string | null;
   takenAt: string;
   year: number;
   month: number;
@@ -68,7 +69,8 @@ export interface UploadSignature {
 
 /** Mutable metadata shared by PUT (full replacement) and POST create. */
 export interface PhotoMetadataInput {
-  title: string;
+  /** Optional — blank form values are sent as null. */
+  title: string | null;
   takenAt: string;
   location: string | null;
   featured: boolean;

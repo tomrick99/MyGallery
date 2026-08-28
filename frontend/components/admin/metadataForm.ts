@@ -49,7 +49,7 @@ export function emptyMetadataValues(): MetadataFormValues {
 
 export function metadataValuesFromPhoto(photo: AdminPhoto): MetadataFormValues {
   return {
-    title: photo.title,
+    title: photo.title ?? "",
     takenAt: photo.takenAt,
     location: photo.location ?? "",
     featured: photo.featured,
@@ -76,8 +76,8 @@ export function validateMetadata(values: MetadataFormValues): MetadataErrors {
   const errors: MetadataErrors = {};
   const today = new Date().toISOString().slice(0, 10);
 
-  if (!values.title.trim()) errors.title = "Title is required.";
-  else if (values.title.trim().length > 200) errors.title = "Max 200 characters.";
+  // Title is optional; only constrain length when provided.
+  if (values.title.trim().length > 200) errors.title = "Max 200 characters.";
 
   if (!values.takenAt) errors.takenAt = "Capture date is required.";
   else if (values.takenAt > today) errors.takenAt = "Date cannot be in the future.";
@@ -110,12 +110,12 @@ const blankToNull = (value: string): string | null => {
 const numberOrNull = (value: string): number | null =>
   value.trim() === "" ? null : Number(value);
 
-/** Blank optional fields become null; required fields always present. */
+/** Blank optional fields become null (including title); takenAt is required. */
 export function buildMetadataPayload(
   values: MetadataFormValues,
 ): PhotoMetadataInput {
   return {
-    title: values.title.trim(),
+    title: blankToNull(values.title),
     takenAt: values.takenAt,
     location: blankToNull(values.location),
     featured: values.featured,
