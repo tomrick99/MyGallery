@@ -164,7 +164,6 @@ export default function AdminDashboard({
         <AdminUploadPanel
           onClose={() => setUploadOpen(false)}
           onSaved={() => {
-            setUploadOpen(false);
             setPage(0);
             void fetchPage(0);
           }}

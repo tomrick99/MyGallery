@@ -1,331 +1,389 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
-import type { UploadSignature } from "@/types/admin";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import type { Visibility } from "@/types/admin";
 import {
   AdminApiError,
   createPhoto,
   requestUploadSignature,
   uploadToCloudinary,
 } from "@/lib/api/admin-client";
+import { readExifCaptureDate } from "@/lib/admin/exif";
 import { describeAdminError } from "./errors";
 import {
-  buildMetadataPayload,
-  emptyMetadataValues,
-  mapBackendFieldErrors,
-  validateMetadata,
-  type MetadataErrors,
-  type MetadataFormValues,
-} from "./metadataForm";
+  createQueueItem,
+  isSignatureExpiring,
+  resolveMimeType,
+  type QueueItem,
+} from "./uploadQueue";
 import AdminModal from "./AdminModal";
-import { Field, TextArea, TextInput } from "./fields";
 import styles from "./admin.module.css";
 
 /**
- * AdminUploadPanel — direct Cloudinary upload flow:
+ * AdminUploadPanel — batch direct-upload queue.
  *
- *   file + metadata (validated locally)
- *   → POST /admin/uploads/signature      (only when Save is pressed)
- *   → browser → Cloudinary direct upload (XHR, real 0–100% progress)
- *   → POST /admin/photos                 (Spring verifies the asset)
- *
- * If the Cloudinary upload succeeded but create fails, the signed publicId
- * is kept in memory and "Save" retries ONLY the create — no duplicate asset
- * is uploaded. Defaults: featured=false, visibility=PRIVATE.
+ * Per item: signed request → browser → Cloudinary → Spring verified create.
+ * At most 2 items upload concurrently. Replay-safe per item: if Cloudinary
+ * succeeded but create failed, retry performs ONLY createPhoto — never a
+ * second asset. Defaults for NEW uploads: featured=true, visibility=PUBLIC.
  */
 
-const MAX_BYTES = 52_428_800; // 50 MiB, backend remains final authority
-
-const ACCEPTED_MIME = new Set([
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/heic",
-  "image/heif",
-]);
-
-const EXTENSION_MIME: Record<string, string> = {
-  jpg: "image/jpeg",
-  jpeg: "image/jpeg",
-  png: "image/png",
-  webp: "image/webp",
-  heic: "image/heic",
-  heif: "image/heif",
-};
-
-function resolveMimeType(file: File): string | null {
-  if (ACCEPTED_MIME.has(file.type)) return file.type;
-  if (file.type === "") {
-    const extension = file.name.split(".").pop()?.toLowerCase() ?? "";
-    return EXTENSION_MIME[extension] ?? null;
-  }
-  return null;
-}
-
-function isSignatureExpiring(signature: UploadSignature): boolean {
-  const parsed = Date.parse(signature.expiresAt);
-  const expiresMs = Number.isNaN(parsed)
-    ? Number(signature.expiresAt) * 1000
-    : parsed;
-  if (Number.isNaN(expiresMs)) return false;
-  return expiresMs - Date.now() < 30_000;
-}
-
-type Phase = "form" | "preparing" | "uploading" | "verifying";
-
-const PHASE_LABEL: Record<Exclude<Phase, "form">, string> = {
-  preparing: "Preparing…",
-  uploading: "Uploading",
-  verifying: "Verifying…",
-};
+const CONCURRENCY = 2;
 
 export default function AdminUploadPanel({
   onClose,
   onSaved,
 }: {
   onClose: () => void;
+  /** Called after each batch run that produced creations — refresh list. */
   onSaved: () => void;
 }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [previewFailed, setPreviewFailed] = useState(false);
-  const [values, setValues] = useState<MetadataFormValues>(emptyMetadataValues);
-  const [errors, setErrors] = useState<MetadataErrors>({});
-  const [phase, setPhase] = useState<Phase>("form");
-  const [progress, setProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [uploadedPublicId, setUploadedPublicId] = useState<string | null>(null);
+  const [items, setItems] = useState<QueueItem[]>([]);
+  const [featured, setFeatured] = useState(true);
+  const [visibility, setVisibility] = useState<Visibility>("PUBLIC");
 
-  const busy = phase !== "form";
-
+  const itemsRef = useRef(items);
   useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
+
+  const patch = useCallback((id: string, changes: Partial<QueueItem>) => {
+    setItems((current) =>
+      current.map((item) => (item.id === id ? { ...item, ...changes } : item)),
+    );
+  }, []);
+
+  // Revoke every remaining preview URL on unmount.
+  useEffect(() => {
+    const ref = itemsRef;
     return () => {
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      for (const item of ref.current) {
+        if (item.previewUrl) URL.revokeObjectURL(item.previewUrl);
+      }
     };
-  }, [previewUrl]);
+  }, []);
 
-  const set =
-    <K extends keyof MetadataFormValues>(key: K) =>
-    (value: MetadataFormValues[K]) =>
-      setValues((current) => ({ ...current, [key]: value }));
-
-  const onFileChange = (next: File | null) => {
-    setError(null);
-    setUploadedPublicId(null);
-    if (previewUrl) URL.revokeObjectURL(previewUrl);
-    setPreviewUrl(null);
-    setPreviewFailed(false);
-
-    if (!next) {
-      setFile(null);
-      return;
+  const addFiles = (files: File[]) => {
+    const created = files.map(createQueueItem);
+    setItems((current) => [...current, ...created]);
+    // EXIF capture dates fill in asynchronously; failure leaves the field
+    // blank and never blocks the item.
+    for (const item of created) {
+      if (item.state !== "ready") continue;
+      void readExifCaptureDate(item.file).then((date) => {
+        if (date) {
+          setItems((current) =>
+            current.map((existing) =>
+              existing.id === item.id && !existing.takenAt
+                ? { ...existing, takenAt: date }
+                : existing,
+            ),
+          );
+        }
+      });
     }
-    if (!resolveMimeType(next)) {
-      setFile(null);
-      setError("Unsupported file type. Use JPEG, PNG, WebP, HEIC or HEIF.");
-      return;
-    }
-    if (next.size > MAX_BYTES) {
-      setFile(null);
-      setError("File exceeds the 50 MiB limit.");
-      return;
-    }
-    setFile(next);
-    setPreviewUrl(URL.createObjectURL(next));
   };
 
-  const submit = async (event: FormEvent) => {
-    event.preventDefault();
-    if (busy) return;
+  const removeItem = (id: string) => {
+    const item = itemsRef.current.find((entry) => entry.id === id);
+    if (item?.previewUrl) URL.revokeObjectURL(item.previewUrl);
+    setItems((current) => current.filter((entry) => entry.id !== id));
+  };
 
-    const clientErrors = validateMetadata(values);
-    setErrors(clientErrors);
-    if (Object.keys(clientErrors).length > 0) return;
-
-    if (!file && !uploadedPublicId) {
-      setError("Choose a photo file first.");
-      return;
-    }
-
-    setError(null);
-
-    try {
-      let publicId = uploadedPublicId;
-
-      if (!publicId && file) {
-        const mime = resolveMimeType(file);
-        if (!mime) {
-          setError("Unsupported file type.");
-          return;
-        }
-
-        setPhase("preparing");
-        const signatureRequest = {
-          fileName: file.name,
-          contentType: mime,
-          bytes: file.size,
-        };
-        let signature = await requestUploadSignature(signatureRequest);
-        if (isSignatureExpiring(signature)) {
-          signature = await requestUploadSignature(signatureRequest);
-        }
-
-        setPhase("uploading");
-        setProgress(0);
-        await uploadToCloudinary(signature, file, setProgress);
-        publicId = signature.publicId;
-        setUploadedPublicId(publicId);
-      }
-
-      if (!publicId) {
-        setError("Choose a photo file first.");
+  const processItem = useCallback(
+    async (id: string) => {
+      const item = itemsRef.current.find((entry) => entry.id === id);
+      if (!item || item.state === "done") return;
+      if (!item.takenAt) {
+        patch(id, { state: "error", error: "Taken At is required." });
         return;
       }
 
-      setPhase("verifying");
-      await createPhoto({
-        ...buildMetadataPayload(values),
-        cloudinaryPublicId: publicId,
-      });
+      try {
+        let publicId = item.uploadedPublicId;
 
-      if (previewUrl) URL.revokeObjectURL(previewUrl);
-      onSaved();
-    } catch (err) {
-      setPhase("form");
-      if (err instanceof AdminApiError && err.fieldErrors) {
-        setErrors(mapBackendFieldErrors(err.fieldErrors));
+        if (!publicId) {
+          const mime = resolveMimeType(item.file);
+          if (!mime) {
+            patch(id, { state: "error", error: "Unsupported file type." });
+            return;
+          }
+          patch(id, { state: "preparing", error: null });
+          const signatureRequest = {
+            fileName: item.file.name,
+            contentType: mime,
+            bytes: item.file.size,
+          };
+          let signature = await requestUploadSignature(signatureRequest);
+          if (isSignatureExpiring(signature)) {
+            signature = await requestUploadSignature(signatureRequest);
+          }
+
+          patch(id, { state: "uploading", progress: 0 });
+          await uploadToCloudinary(signature, item.file, (percent) =>
+            patch(id, { progress: percent }),
+          );
+          publicId = signature.publicId;
+          patch(id, { uploadedPublicId: publicId });
+        }
+
+        patch(id, { state: "verifying" });
+        await createPhoto({
+          title: item.title.trim() === "" ? null : item.title.trim(),
+          takenAt: item.takenAt,
+          location: null,
+          featured,
+          visibility,
+          camera: null,
+          lens: null,
+          focalLengthMm: null,
+          aperture: null,
+          shutterSpeedSeconds: null,
+          iso: null,
+          description: null,
+          cloudinaryPublicId: publicId,
+        });
+        patch(id, { state: "done", progress: 100, error: null });
+      } catch (err) {
+        patch(id, {
+          state: "error",
+          error:
+            err instanceof AdminApiError
+              ? describeAdminError(err)
+              : "Upload failed.",
+        });
       }
-      setError(describeAdminError(err));
-    }
+    },
+    [featured, visibility, patch],
+  );
+
+  const busy = items.some(
+    (item) =>
+      item.state === "preparing" ||
+      item.state === "uploading" ||
+      item.state === "verifying",
+  );
+
+  const pending = items.filter(
+    (item) => item.state === "ready" || item.state === "error",
+  );
+  const doneCount = items.filter((item) => item.state === "done").length;
+  const errorCount = items.filter((item) => item.state === "error").length;
+  const missingDates = pending.filter((item) => !item.takenAt).length;
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (busy || pending.length === 0) return;
+
+    const queue = pending.map((item) => item.id);
+    const workers = Array.from({ length: CONCURRENCY }, async () => {
+      let next = queue.shift();
+      while (next) {
+        await processItem(next);
+        next = queue.shift();
+      }
+    });
+    await Promise.all(workers);
+
+    const finished = itemsRef.current.some((item) => item.state === "done");
+    if (finished) onSaved();
   };
 
-  const fileSummary = file
-    ? `${file.name} · ${resolveMimeType(file) ?? "unknown"} · ${(file.size / 1_048_576).toFixed(1)} MB`
-    : null;
-
   return (
-    <AdminModal label="Upload photo" busy={busy} onClose={onClose} wide>
-      <form className={styles.editor} onSubmit={submit}>
-        <div className={styles.editorPreview}>
-          {previewUrl && !previewFailed ? (
-            // Local object-URL preview; revoked on close/success.
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={previewUrl}
-              alt="Selected file preview"
-              className={styles.editorImage}
-              onError={() => setPreviewFailed(true)}
-            />
-          ) : (
-            <div className={styles.uploadPlaceholder}>
-              {fileSummary ?? "No file selected"}
-            </div>
-          )}
-          <Field label="File (JPEG / PNG / WebP / HEIC / HEIF, ≤ 50 MiB)">
+    <AdminModal label="Upload photos" busy={busy} onClose={onClose} wide>
+      <form className={styles.uploadForm} onSubmit={submit}>
+        <div className={styles.uploadCommon}>
+          <Field fileInput onFiles={addFiles} disabled={busy} />
+          <label className={styles.checkboxField}>
             <input
-              type="file"
-              accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
-              className={styles.fileInput}
-              disabled={busy || uploadedPublicId !== null}
-              onChange={(e) => onFileChange(e.target.files?.[0] ?? null)}
+              type="checkbox"
+              checked={featured}
+              onChange={(e) => setFeatured(e.target.checked)}
+              disabled={busy}
             />
-          </Field>
-          {uploadedPublicId ? (
-            <p className={styles.uploadedNote}>
-              File uploaded — fix metadata and save again if needed. No
-              duplicate will be uploaded.
-            </p>
-          ) : null}
+            <span>Featured</span>
+          </label>
+          <label className={styles.field}>
+            <span className={styles.fieldLabel}>Visibility</span>
+            <select
+              className={styles.input}
+              value={visibility}
+              disabled={busy}
+              onChange={(e) => setVisibility(e.target.value as Visibility)}
+            >
+              <option value="PUBLIC">PUBLIC</option>
+              <option value="PRIVATE">PRIVATE</option>
+            </select>
+          </label>
         </div>
 
-        <div className={styles.editorFields}>
-          <Field label="Title (optional)" error={errors.title}>
-            <TextInput value={values.title} onChange={set("title")} maxLength={200} />
-          </Field>
-          <Field label="Taken At" error={errors.takenAt}>
-            <TextInput type="date" value={values.takenAt} onChange={set("takenAt")} required />
-          </Field>
-          <Field label="Location" error={errors.location}>
-            <TextInput value={values.location} onChange={set("location")} maxLength={200} />
-          </Field>
+        {items.length > 0 ? (
+          <ul className={styles.queue}>
+            {items.map((item) => (
+              <li key={item.id} className={styles.queueItem}>
+                <span className={styles.queueThumb}>
+                  {item.previewUrl && !item.previewFailed ? (
+                    // Local object-URL preview; revoked on remove/unmount.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={item.previewUrl}
+                      alt=""
+                      onError={() => patch(item.id, { previewFailed: true })}
+                    />
+                  ) : (
+                    <span className={styles.queueThumbEmpty}>—</span>
+                  )}
+                </span>
 
-          <div className={styles.inlineFields}>
-            <label className={styles.checkboxField}>
-              <input
-                type="checkbox"
-                checked={values.featured}
-                onChange={(e) => set("featured")(e.target.checked)}
-              />
-              <span>Featured</span>
-            </label>
-            <Field label="Visibility">
-              <select
-                className={styles.input}
-                value={values.visibility}
-                onChange={(e) => set("visibility")(e.target.value as "PUBLIC" | "PRIVATE")}
-              >
-                <option value="PRIVATE">PRIVATE</option>
-                <option value="PUBLIC">PUBLIC</option>
-              </select>
-            </Field>
-          </div>
+                <span className={styles.queueMain}>
+                  <span className={styles.queueName}>{item.file.name}</span>
+                  <span className={styles.queueInputs}>
+                    <input
+                      type="text"
+                      className={styles.input}
+                      placeholder="Title (optional)"
+                      maxLength={200}
+                      value={item.title}
+                      disabled={busy || item.state === "done"}
+                      onChange={(e) => patch(item.id, { title: e.target.value })}
+                      aria-label={`Title for ${item.file.name}`}
+                    />
+                    <input
+                      type="date"
+                      className={`${styles.input} ${!item.takenAt && item.state !== "done" ? styles.dateMissing : ""}`}
+                      value={item.takenAt}
+                      disabled={busy || item.state === "done"}
+                      onChange={(e) =>
+                        patch(item.id, { takenAt: e.target.value })
+                      }
+                      aria-label={`Taken at for ${item.file.name}`}
+                      required={item.state === "ready"}
+                    />
+                  </span>
+                  {item.state === "uploading" || item.state === "verifying" || item.state === "preparing" ? (
+                    <span className={styles.queueProgress}>
+                      <span
+                        className={styles.queueProgressBar}
+                        style={{ width: `${item.state === "uploading" ? item.progress : 100}%` }}
+                      />
+                    </span>
+                  ) : null}
+                  {item.error ? (
+                    <span className={styles.queueError}>{item.error}</span>
+                  ) : null}
+                </span>
 
-          <Field label="Camera" error={errors.camera}>
-            <TextInput value={values.camera} onChange={set("camera")} maxLength={150} />
-          </Field>
-          <Field label="Lens" error={errors.lens}>
-            <TextInput value={values.lens} onChange={set("lens")} maxLength={200} />
-          </Field>
+                <span className={styles.queueSide}>
+                  <span className={styles.queueState} data-state={item.state}>
+                    {item.state === "done"
+                      ? "Done"
+                      : item.state === "uploading"
+                        ? `${item.progress}%`
+                        : item.state === "error"
+                          ? "Needs attention"
+                          : item.state === "ready"
+                            ? "Ready"
+                            : "…"}
+                  </span>
+                  {item.state === "error" && item.uploadedPublicId ? (
+                    <button
+                      type="button"
+                      className={styles.ghostButton}
+                      disabled={busy}
+                      onClick={() => void processItem(item.id)}
+                    >
+                      Retry Save
+                    </button>
+                  ) : item.state === "error" ? (
+                    <button
+                      type="button"
+                      className={styles.ghostButton}
+                      disabled={busy}
+                      onClick={() => void processItem(item.id)}
+                    >
+                      Retry
+                    </button>
+                  ) : null}
+                  {item.state !== "done" && !busy ? (
+                    <button
+                      type="button"
+                      className={styles.queueRemove}
+                      onClick={() => removeItem(item.id)}
+                      aria-label={`Remove ${item.file.name}`}
+                    >
+                      Remove
+                    </button>
+                  ) : null}
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className={styles.stateText}>
+            Select one or more photographs to begin.
+          </p>
+        )}
 
-          <div className={styles.inlineFields}>
-            <Field label="Focal Length (mm)" error={errors.focalLengthMm}>
-              <TextInput inputMode="decimal" value={values.focalLengthMm} onChange={set("focalLengthMm")} placeholder="35" />
-            </Field>
-            <Field label="Aperture" error={errors.aperture}>
-              <TextInput inputMode="decimal" value={values.aperture} onChange={set("aperture")} placeholder="2.8" />
-            </Field>
-          </div>
-          <div className={styles.inlineFields}>
-            <Field label="Shutter (s)" error={errors.shutterSpeedSeconds}>
-              <TextInput inputMode="decimal" value={values.shutterSpeedSeconds} onChange={set("shutterSpeedSeconds")} placeholder="0.004" />
-            </Field>
-            <Field label="ISO" error={errors.iso}>
-              <TextInput inputMode="numeric" value={values.iso} onChange={set("iso")} placeholder="400" />
-            </Field>
-          </div>
+        {items.length > 0 && (doneCount > 0 || errorCount > 0) ? (
+          <p className={styles.uploadSummary} aria-live="polite">
+            {doneCount} uploaded
+            {errorCount > 0 ? ` · ${errorCount} needs attention` : ""}
+          </p>
+        ) : null}
 
-          <Field label="Description" error={errors.description}>
-            <TextArea rows={3} value={values.description} onChange={set("description")} maxLength={5000} />
-          </Field>
+        {missingDates > 0 ? (
+          <p className={styles.queueError}>
+            {missingDates} photo{missingDates === 1 ? "" : "s"} missing a
+            capture date — fill the highlighted Taken At fields.
+          </p>
+        ) : null}
 
-          {busy ? (
-            <div className={styles.progressWrap} aria-live="polite">
-              <span className={styles.progressLabel}>
-                {phase === "uploading"
-                  ? `${PHASE_LABEL.uploading} ${progress}%`
-                  : PHASE_LABEL[phase as Exclude<Phase, "form">]}
-              </span>
-              <span className={styles.progressTrack}>
-                <span
-                  className={styles.progressBar}
-                  style={{ width: `${phase === "uploading" ? progress : 100}%` }}
-                />
-              </span>
-            </div>
-          ) : null}
-
-          {error ? <p className={styles.errorBanner}>{error}</p> : null}
-
-          <div className={styles.editorActions}>
-            <button type="submit" className={styles.primaryButton} disabled={busy}>
-              {uploadedPublicId ? "Retry Save" : busy ? "Working…" : "Upload & Save"}
-            </button>
-            <button type="button" className={styles.ghostButton} onClick={onClose} disabled={busy}>
-              Cancel
-            </button>
-          </div>
+        <div className={styles.editorActions}>
+          <button
+            type="submit"
+            className={styles.primaryButton}
+            disabled={busy || pending.length === 0}
+          >
+            Upload {pending.length} photo{pending.length === 1 ? "" : "s"}
+          </button>
+          <button
+            type="button"
+            className={styles.ghostButton}
+            onClick={onClose}
+            disabled={busy}
+          >
+            {doneCount > 0 ? "Done" : "Cancel"}
+          </button>
         </div>
       </form>
     </AdminModal>
+  );
+}
+
+function Field({
+  onFiles,
+  disabled,
+}: {
+  fileInput?: boolean;
+  onFiles: (files: File[]) => void;
+  disabled: boolean;
+}) {
+  return (
+    <label className={styles.field}>
+      <span className={styles.fieldLabel}>
+        Files (JPEG / PNG / WebP / HEIC / HEIF, ≤ 50 MiB each)
+      </span>
+      <input
+        type="file"
+        multiple
+        accept=".jpg,.jpeg,.png,.webp,.heic,.heif"
+        className={styles.fileInput}
+        disabled={disabled}
+        onChange={(e) => {
+          onFiles(Array.from(e.target.files ?? []));
+          e.target.value = "";
+        }}
+      />
+    </label>
   );
 }
